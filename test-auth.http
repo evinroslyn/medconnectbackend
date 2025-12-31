@@ -1,0 +1,78 @@
+### Test Health Check
+GET http://localhost:3000/health
+
+### Test Inscription Patient
+POST http://localhost:3000/api/auth/register
+Content-Type: application/json
+
+{
+  "telephone": "+33123456789",
+  "motDePasse": "MotDePasse123",
+  "typeUtilisateur": "patient",
+  "nom": "Jean Dupont",
+  "adresse": "123 Rue de la Santé, 75001 Paris",
+  "dateNaissance": "1990-05-15",
+  "genre": "Homme"
+}
+
+### Test Inscription Médecin
+POST http://localhost:3000/api/auth/register
+Content-Type: application/json
+
+{
+  "telephone": "+33987654321",
+  "motDePasse": "MedecinPass123",
+  "typeUtilisateur": "medecin",
+  "nom": "Dr. Marie Martin",
+  "adresse": "456 Avenue des Médecins, 75002 Paris",
+  "specialite": "Cardiologie",
+  "numeroLicence": "12345-CARD-2024"
+}
+
+### Test Connexion Patient
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "telephone": "+33123456789",
+  "motDePasse": "MotDePasse123"
+}
+
+### Test Connexion Médecin
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "telephone": "+33987654321",
+  "motDePasse": "MedecinPass123"
+}
+
+### Test Profil (nécessite un token)
+GET http://localhost:3000/api/auth/profile
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Test Activation 2FA (nécessite un token)
+POST http://localhost:3000/api/auth/2fa/enable
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Test Connexion avec 2FA
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "telephone": "+33123456789",
+  "motDePasse": "MotDePasse123",
+  "code2FA": "123456"
+}
+
+### Test Désactivation 2FA (nécessite un token)
+POST http://localhost:3000/api/auth/2fa/disable
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "code2FA": "123456"
+}
+
+### Test Déconnexion
+POST http://localhost:3000/api/auth/logout
