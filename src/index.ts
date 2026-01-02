@@ -34,10 +34,12 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 // En production, utiliser CORS_ORIGIN depuis les variables d'environnement
 // En développement, autoriser toutes les origines pour faciliter les tests
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN 
+  origin: process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map(origin => origin.trim())
-    : (process.env.NODE_ENV === "production" 
-      ? [] // En production sans CORS_ORIGIN, ne rien autoriser par défaut
+    : (process.env.NODE_ENV === "production"
+      ? [
+        "https://medconnectweb122.vercel.app"
+      ] // En production sans CORS_ORIGIN, ne rien autoriser par défaut
       : true), // Autoriser toutes les origines en développement
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -50,11 +52,11 @@ app.use(cors(corsOptions));
 // express.json() et express.urlencoded() ne parseront PAS automatiquement multipart/form-data
 // Multer gère le parsing des multipart/form-data
 // IMPORTANT: Ces middlewares doivent être avant les routes pour parser le body
-app.use(express.json({ 
+app.use(express.json({
   limit: "50mb"
 }));
-app.use(express.urlencoded({ 
-  extended: true, 
+app.use(express.urlencoded({
+  extended: true,
   limit: "50mb"
 }));
 
@@ -67,7 +69,7 @@ if (process.env.NODE_ENV === "development") {
       contentType: req.headers["content-type"],
       contentLength: req.headers["content-length"],
     };
-    
+
     // Pour les requêtes POST/PATCH/PUT, logger aussi le body (si JSON)
     if (["POST", "PATCH", "PUT"].includes(req.method)) {
       logData.hasBody = !!req.body;
@@ -81,7 +83,7 @@ if (process.env.NODE_ENV === "development") {
         logData.bodyPreview = "body is null/undefined";
       }
     }
-    
+
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`, logData);
     next();
   });
@@ -93,12 +95,12 @@ app.use("/uploads", (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-  
+
   // Gérer les requêtes OPTIONS (preflight)
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
-  
+
   return next();
 }, express.static(path.join(process.cwd(), "uploads")));
 
@@ -123,7 +125,7 @@ app.use("/api/files", filesRoutes);
 app.use("/api/dossiers-medicaux", dossierMedicalRoutes);
 // #region agent log
 app.use("/api/documents-medicaux", (req, _res, next) => {
-  fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:115',message:'Route /api/documents-medicaux matched in main app',data:{path:req.path,url:req.url,method:req.method,originalUrl:req.originalUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'index.ts:115', message: 'Route /api/documents-medicaux matched in main app', data: { path: req.path, url: req.url, method: req.method, originalUrl: req.originalUrl }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' }) }).catch(() => { });
   next();
 }, documentMedicalRoutes);
 // #endregion
@@ -174,7 +176,7 @@ httpServer.listen(PORT, HOST, async () => {
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   console.log(`📱 Pour l'émulateur Android: http://10.0.2.2:${PORT}/api`);
   console.log(`🔌 WebSocket disponible sur ws://localhost:${PORT}`);
-  
+
   // Test de la connexion MySQL et création des tables
   try {
     await testConnection();
