@@ -203,7 +203,7 @@ export class AdminService {
               .from(administrateurs)
               .where(eq(administrateurs.id, medecin.adminValidateurId))
               .limit(1);
-            
+
             if (adminData.length > 0) {
               adminValidateurNom = adminData[0].nom;
             }
@@ -272,7 +272,7 @@ export class AdminService {
               .from(administrateurs)
               .where(eq(administrateurs.id, medecin.adminValidateurId))
               .limit(1);
-            
+
             if (adminData.length > 0) {
               adminValidateurNom = adminData[0].nom;
             }
@@ -351,7 +351,7 @@ export class AdminService {
       // Mettre à jour le statut et le mot de passe
       await db
         .update(medecins)
-        .set({ 
+        .set({
           statutVerification: "valide",
           dateValidation: new Date(),
           adminValidateurId: adminId
@@ -437,7 +437,7 @@ export class AdminService {
       // Mettre à jour le statut de rejet avec le motif
       await db
         .update(medecins)
-        .set({ 
+        .set({
           statutVerification: "rejete",
           motifRejet: motifFinal,
           dateValidation: new Date(),
@@ -537,7 +537,7 @@ export class AdminService {
       // Mark date filters as used to avoid "assigned but never used" warnings
       void _dateDebut; // may be used later for advanced date filtering
       void _dateFin; // may be used later for advanced date filtering
-      
+
       let query = db
         .select({
           id: medecins.id,
@@ -560,19 +560,19 @@ export class AdminService {
 
       // Appliquer les filtres
       const conditions = [];
-      
+
       if (statut) {
         conditions.push(eq(medecins.statutVerification, statut));
       }
-      
+
       if (nom) {
         conditions.push(eq(medecins.nom, nom));
       }
-      
+
       if (specialite) {
         conditions.push(eq(medecins.specialite, specialite));
       }
-      
+
       if (numeroLicence) {
         conditions.push(eq(medecins.numeroLicence, numeroLicence));
       }
@@ -611,7 +611,7 @@ export class AdminService {
               .from(administrateurs)
               .where(eq(administrateurs.id, medecin.adminValidateurId))
               .limit(1);
-            
+
             if (adminData.length > 0) {
               adminValidateurNom = adminData[0].nom;
             }
@@ -654,28 +654,28 @@ export class AdminService {
     try {
       // Compter les médecins par statut
       const medecinsEnAttente = await db
-        .select()
+        .select({ id: medecins.id })
         .from(medecins)
         .where(eq(medecins.statutVerification, "en_attente"));
 
       const medecinsValides = await db
-        .select()
+        .select({ id: medecins.id })
         .from(medecins)
         .where(eq(medecins.statutVerification, "valide"));
 
       const medecinsRejetes = await db
-        .select()
+        .select({ id: medecins.id })
         .from(medecins)
         .where(eq(medecins.statutVerification, "rejete"));
 
       // Compter tous les utilisateurs par type
       const patients = await db
-        .select()
+        .select({ id: utilisateurs.id })
         .from(utilisateurs)
         .where(eq(utilisateurs.typeUtilisateur, "patient"));
 
       const administrateurs = await db
-        .select()
+        .select({ id: utilisateurs.id })
         .from(utilisateurs)
         .where(eq(utilisateurs.typeUtilisateur, "administrateur"));
 
@@ -755,7 +755,7 @@ export class AdminService {
       const usersWithNames = await Promise.all(
         allUsers.map(async (user: any) => {
           let nom = null;
-          
+
           if (user.typeUtilisateur === "patient") {
             const patientData = await db
               .select({ nom: patients.nom })

@@ -141,14 +141,33 @@ export async function createTablesIfNotExists(): Promise<void> {
         console.error("❌ Erreur lors de la création de l'administrateur par défaut:", error.message);
       }
 
+      // Migration spécifique pour Postgres: Ajouter la colonne annees_experience si elle n'existe pas
+      try {
+        const checkColumnQuery = `
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'medecins' 
+          AND column_name = 'annees_experience'
+        `;
+        const { rows } = await client.query(checkColumnQuery);
+
+        if (rows.length === 0) {
+          console.log("📊 Ajout de la colonne 'annees_experience' à la table 'medecins'...");
+          await client.query('ALTER TABLE medecins ADD COLUMN annees_experience VARCHAR(10)');
+          console.log("✅ Colonne 'annees_experience' ajoutée avec succès");
+        }
+      } catch (error: any) {
+        console.error("⚠️ Erreur lors de la migration 'annees_experience' (Postgres):", error.message);
+      }
+
       return;
     }
 
     // === MySQL path (existing logic) ===
     const connection = await dbClient.getConnection();
-    
+
     console.log("📊 Création des tables si nécessaire...");
-    
+
     // Tables dans l'ordre des dépendances
     const createTableQueries = [
       // Table utilisateurs (base)
@@ -167,7 +186,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         code_reset_password VARCHAR(10),
         code_reset_password_expires TIMESTAMP NULL
       )`,
-      
+
       // Table patients
       `      CREATE TABLE IF NOT EXISTS patients (
         id VARCHAR(255) PRIMARY KEY,
@@ -177,7 +196,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         photo_profil VARCHAR(500) NULL,
         FOREIGN KEY (id) REFERENCES utilisateurs(id) ON DELETE CASCADE
       )`,
-      
+
       // Table medecins
       `CREATE TABLE IF NOT EXISTS medecins (
         id VARCHAR(255) PRIMARY KEY,
@@ -190,14 +209,14 @@ export async function createTablesIfNotExists(): Promise<void> {
         photo_profil VARCHAR(500),
         FOREIGN KEY (id) REFERENCES utilisateurs(id) ON DELETE CASCADE
       )`,
-      
+
       // Table administrateurs
       `CREATE TABLE IF NOT EXISTS administrateurs (
         id VARCHAR(255) PRIMARY KEY,
         nom VARCHAR(255) NOT NULL,
         FOREIGN KEY (id) REFERENCES utilisateurs(id) ON DELETE CASCADE
       )`,
-      
+
       // Table dossiers_medicaux
       // Note: type est optionnel car un dossier peut contenir différents types de documents
       // chemin_fichier supprimé - les fichiers sont dans documents_medicaux
@@ -212,7 +231,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         dernier_modification TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         FOREIGN KEY (id_patient) REFERENCES patients(id) ON DELETE CASCADE
       )`,
-      
+
       // Table connexions
       `CREATE TABLE IF NOT EXISTS connexions (
         id VARCHAR(255) PRIMARY KEY,
@@ -225,7 +244,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         FOREIGN KEY (id_patient) REFERENCES patients(id) ON DELETE CASCADE,
         FOREIGN KEY (id_medecin) REFERENCES medecins(id) ON DELETE CASCADE
       )`,
-      
+
       // Table rendez_vous
       `CREATE TABLE IF NOT EXISTS rendez_vous (
         id VARCHAR(255) PRIMARY KEY,
@@ -239,7 +258,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         FOREIGN KEY (id_patient) REFERENCES patients(id) ON DELETE CASCADE,
         FOREIGN KEY (id_medecin) REFERENCES medecins(id) ON DELETE CASCADE
       )`,
-      
+
       // Table disponibilites
       `CREATE TABLE IF NOT EXISTS disponibilites (
         id VARCHAR(255) PRIMARY KEY,
@@ -255,18 +274,18 @@ export async function createTablesIfNotExists(): Promise<void> {
         FOREIGN KEY (id_medecin) REFERENCES medecins(id) ON DELETE CASCADE
       )`,
     ];
-    
+
     for (const query of createTableQueries) {
       await connection.query(query);
     }
-    
+
     // Migrations pour modifier les tables existantes si nécessaire
     try {
       // Vérifier si la table existe
       const [tables]: any = await connection.query(
         `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dossiers_medicaux'`
       );
-      
+
       if (tables.length > 0) {
         // Vérifier si la colonne type existe et si elle est NOT NULL
         const [columns]: any = await connection.query(
@@ -276,7 +295,7 @@ export async function createTablesIfNotExists(): Promise<void> {
            AND TABLE_NAME = 'dossiers_medicaux' 
            AND COLUMN_NAME = 'type'`
         );
-        
+
         if (columns.length > 0 && columns[0].IS_NULLABLE === 'NO') {
           // Migration: Rendre la colonne 'type' nullable dans dossiers_medicaux
           await connection.query(
@@ -292,7 +311,7 @@ export async function createTablesIfNotExists(): Promise<void> {
       // Logger l'erreur pour debug
       console.error(`❌ Erreur lors de la migration 'type': ${error.message}`);
     }
-    
+
     try {
       // Migration: Supprimer la colonne chemin_fichier si elle existe
       await connection.query(`ALTER TABLE dossiers_medicaux DROP COLUMN chemin_fichier`);
@@ -302,7 +321,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         console.log(`ℹ️  Migration 'chemin_fichier' ignorée: ${error.message}`);
       }
     }
-    
+
     // Migrations pour documents_medicaux
     try {
       // Vérifier si la colonne description existe
@@ -312,7 +331,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'documents_medicaux' 
          AND COLUMN_NAME = 'description'`
       );
-      
+
       if (docColumns.length === 0) {
         // Ajouter la colonne description
         await connection.query(
@@ -323,7 +342,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'description': ${error.message}`);
     }
-    
+
     try {
       // Vérifier si id_dossier_medical est NOT NULL
       const [docIdColumns]: any = await connection.query(
@@ -332,7 +351,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'documents_medicaux' 
          AND COLUMN_NAME = 'id_dossier_medical'`
       );
-      
+
       if (docIdColumns.length > 0 && docIdColumns[0].IS_NULLABLE === 'YES') {
         // Rendre id_dossier_medical NOT NULL
         await connection.query(
@@ -343,13 +362,13 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'id_dossier_medical': ${error.message}`);
     }
-    
+
     // Migration pour ajouter les colonnes diplome et photo_profil à medecins
     try {
       const [medecinsTable]: any = await connection.query(
         `SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'medecins'`
       );
-      
+
       if (medecinsTable.length > 0) {
         const [medecinsColumns]: any = await connection.query(
           `SELECT COLUMN_NAME 
@@ -358,9 +377,9 @@ export async function createTablesIfNotExists(): Promise<void> {
            AND TABLE_NAME = 'medecins' 
            AND COLUMN_NAME IN ('diplome', 'photo_profil')`
         );
-        
+
         const existingColumns = medecinsColumns.map((col: any) => col.COLUMN_NAME);
-        
+
         if (!existingColumns.includes('diplome')) {
           await connection.query(
             `ALTER TABLE medecins ADD COLUMN diplome VARCHAR(500)`
@@ -369,7 +388,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         } else {
           console.log("ℹ️  Migration 'diplome' non nécessaire (colonne déjà présente)");
         }
-        
+
         if (!existingColumns.includes('photo_profil')) {
           await connection.query(
             `ALTER TABLE medecins ADD COLUMN photo_profil VARCHAR(500)`
@@ -382,7 +401,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'diplome/photo_profil': ${error.message}`);
     }
-    
+
     // Migration pour ajouter les colonnes de réinitialisation de mot de passe
     try {
       // Vérifier si la colonne code_reset_password existe
@@ -392,7 +411,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'utilisateurs' 
          AND COLUMN_NAME = 'code_reset_password'`
       );
-      
+
       if (resetColumns.length === 0) {
         // Ajouter les colonnes pour la réinitialisation de mot de passe
         await connection.query(
@@ -417,7 +436,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         AND TABLE_NAME = 'patients' 
         AND COLUMN_NAME = 'photo_profil'
       `);
-      
+
       if (columns.length === 0) {
         await connection.query(`
           ALTER TABLE patients ADD COLUMN photo_profil VARCHAR(500) NULL
@@ -439,13 +458,13 @@ export async function createTablesIfNotExists(): Promise<void> {
         AND TABLE_NAME = 'commentaires' 
         AND COLUMN_NAME = 'id_document_medical'
       `);
-      
+
       if (columns.length === 0) {
         await connection.query(`
           ALTER TABLE commentaires ADD COLUMN id_document_medical VARCHAR(255) NULL
         `);
         console.log("✅ Migration 'id_document_medical' ajoutée à commentaires");
-        
+
         // Ajouter la contrainte de clé étrangère
         try {
           await connection.query(`
@@ -478,7 +497,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         AND TABLE_NAME = 'medecins' 
         AND COLUMN_NAME = 'annees_experience'
       `);
-      
+
       if (columns.length === 0) {
         await connection.query(`
           ALTER TABLE medecins ADD COLUMN annees_experience VARCHAR(10) NULL
@@ -500,7 +519,7 @@ export async function createTablesIfNotExists(): Promise<void> {
         AND TABLE_NAME = 'allergies' 
         AND COLUMN_NAME = 'date_decouverte'
       `);
-      
+
       if (columns.length === 0) {
         await connection.query(`
           ALTER TABLE allergies ADD COLUMN date_decouverte TIMESTAMP NULL
@@ -512,7 +531,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'date_decouverte' pour allergies: ${error.message}`);
     }
-    
+
     // Migration pour ajouter les colonnes description, education, specialisations à medecins
     try {
       const [medecinsDescColumns]: any = await connection.query(
@@ -521,7 +540,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'medecins' 
          AND COLUMN_NAME = 'description'`
       );
-      
+
       if (medecinsDescColumns.length === 0) {
         await connection.query(
           `ALTER TABLE medecins ADD COLUMN description TEXT NULL`
@@ -531,7 +550,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'description' medecins: ${error.message}`);
     }
-    
+
     try {
       const [medecinsEduColumns]: any = await connection.query(
         `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
@@ -539,7 +558,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'medecins' 
          AND COLUMN_NAME = 'education'`
       );
-      
+
       if (medecinsEduColumns.length === 0) {
         await connection.query(
           `ALTER TABLE medecins ADD COLUMN education TEXT NULL`
@@ -549,7 +568,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'education' medecins: ${error.message}`);
     }
-    
+
     try {
       const [medecinsSpecColumns]: any = await connection.query(
         `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
@@ -557,7 +576,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'medecins' 
          AND COLUMN_NAME = 'specialisations'`
       );
-      
+
       if (medecinsSpecColumns.length === 0) {
         await connection.query(
           `ALTER TABLE medecins ADD COLUMN specialisations TEXT NULL`
@@ -567,7 +586,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'specialisations' medecins: ${error.message}`);
     }
-    
+
     // Migration pour ajouter la colonne date_validation à medecins
     try {
       const [dateValidationColumns]: any = await connection.query(
@@ -576,7 +595,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'medecins' 
          AND COLUMN_NAME = 'date_validation'`
       );
-      
+
       if (dateValidationColumns.length === 0) {
         await connection.query(
           `ALTER TABLE medecins ADD COLUMN date_validation TIMESTAMP NULL`
@@ -586,7 +605,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'date_validation' medecins: ${error.message}`);
     }
-    
+
     // Migration pour ajouter la colonne motif_rejet à medecins
     try {
       const [motifRejetColumns]: any = await connection.query(
@@ -595,7 +614,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'medecins' 
          AND COLUMN_NAME = 'motif_rejet'`
       );
-      
+
       if (motifRejetColumns.length === 0) {
         await connection.query(
           `ALTER TABLE medecins ADD COLUMN motif_rejet TEXT NULL`
@@ -605,7 +624,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'motif_rejet' medecins: ${error.message}`);
     }
-    
+
     // Migration pour ajouter la colonne admin_validateur_id à medecins
     try {
       const [adminValidateurColumns]: any = await connection.query(
@@ -614,7 +633,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'medecins' 
          AND COLUMN_NAME = 'admin_validateur_id'`
       );
-      
+
       if (adminValidateurColumns.length === 0) {
         await connection.query(
           `ALTER TABLE medecins ADD COLUMN admin_validateur_id VARCHAR(255) NULL,
@@ -625,7 +644,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'admin_validateur_id' medecins: ${error.message}`);
     }
-    
+
     // Migration pour ajouter la colonne historique_actions à medecins
     try {
       const [historiqueActionsColumns]: any = await connection.query(
@@ -634,7 +653,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          AND TABLE_NAME = 'medecins' 
          AND COLUMN_NAME = 'historique_actions'`
       );
-      
+
       if (historiqueActionsColumns.length === 0) {
         await connection.query(
           `ALTER TABLE medecins ADD COLUMN historique_actions TEXT NULL`
@@ -644,7 +663,7 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la migration 'historique_actions' medecins: ${error.message}`);
     }
-    
+
     // Migration pour créer la table historique_validations si elle n'existe pas
     try {
       const [tables]: any = await connection.query(
@@ -652,7 +671,7 @@ export async function createTablesIfNotExists(): Promise<void> {
          WHERE TABLE_SCHEMA = DATABASE() 
          AND TABLE_NAME = 'historique_validations'`
       );
-      
+
       if (tables.length === 0) {
         await connection.query(
           `CREATE TABLE historique_validations (
@@ -678,10 +697,10 @@ export async function createTablesIfNotExists(): Promise<void> {
     } catch (error: any) {
       console.error(`❌ Erreur lors de la création de la table 'historique_validations': ${error.message}`);
     }
-    
+
     connection.release();
     console.log("✅ Tables créées avec succès");
-    
+
     // Créer l'administrateur par défaut si nécessaire
     try {
       const { createDefaultAdmin } = await import("./create-default-admin");
