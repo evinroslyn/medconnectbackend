@@ -34,7 +34,7 @@ export class DocumentMedicalService {
 
       return {
         success: true,
-        data: documents.map((d) => ({
+        data: documents.map((d: any) => ({
           id: d.id,
           idDossierMedical: d.idDossierMedical,
           idPatient: d.idPatient,
@@ -67,7 +67,7 @@ export class DocumentMedicalService {
 
       return {
         success: true,
-        data: documents.map((d) => ({
+        data: documents.map((d: any) => ({
           id: d.id,
           idDossierMedical: d.idDossierMedical,
           idPatient: d.idPatient,

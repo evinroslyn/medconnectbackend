@@ -1,0 +1,61 @@
+# Tests du Système de Suivi des Demandes d'Administration
+# Utiliser avec l'extension REST Client de VS Code
+
+### Variables
+@baseUrl = http://localhost:3000/api
+@adminToken = YOUR_ADMIN_TOKEN_HERE
+@medecinId = MEDECIN_ID_TO_TEST
+
+### 1. Récupérer les médecins en attente
+GET {{baseUrl}}/admin/medecins/en-attente
+Authorization: Bearer {{adminToken}}
+
+### 2. Récupérer les médecins validés (avec historique)
+GET {{baseUrl}}/admin/medecins/valides
+Authorization: Bearer {{adminToken}}
+
+### 3. Récupérer les médecins rejetés (avec historique)
+GET {{baseUrl}}/admin/medecins/rejetes
+Authorization: Bearer {{adminToken}}
+
+### 4. Valider un médecin
+PATCH {{baseUrl}}/admin/medecins/{{medecinId}}/valider
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+### 5. Rejeter un médecin avec motif
+PATCH {{baseUrl}}/admin/medecins/{{medecinId}}/rejeter
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "motif": "Documents incomplets - Diplôme non lisible. Merci de fournir une copie de meilleure qualité."
+}
+
+### 6. Consulter l'historique d'un médecin
+GET {{baseUrl}}/admin/medecins/{{medecinId}}/historique
+Authorization: Bearer {{adminToken}}
+
+### 7. Rechercher des médecins par statut
+GET {{baseUrl}}/admin/medecins/rechercher?statut=valide&page=1&limit=5
+Authorization: Bearer {{adminToken}}
+
+### 8. Rechercher des médecins par spécialité
+GET {{baseUrl}}/admin/medecins/rechercher?specialite=Cardiologie&page=1&limit=10
+Authorization: Bearer {{adminToken}}
+
+### 9. Rechercher avec filtres multiples
+GET {{baseUrl}}/admin/medecins/rechercher?statut=rejete&nom=Martin&page=1&limit=10
+Authorization: Bearer {{adminToken}}
+
+### 10. Récupérer les statistiques
+GET {{baseUrl}}/admin/statistiques
+Authorization: Bearer {{adminToken}}
+
+### 11. Test de pagination
+GET {{baseUrl}}/admin/medecins/rechercher?page=2&limit=5
+Authorization: Bearer {{adminToken}}
+
+### 12. Test de recherche par numéro de licence
+GET {{baseUrl}}/admin/medecins/rechercher?numeroLicence=12345
+Authorization: Bearer {{adminToken}}

@@ -11,6 +11,10 @@ export interface MedecinInfo {
   telephone?: string;
   adresse?: string;
   anneesExperience?: string;
+  description?: string;
+  education?: string;
+  specialisations?: string;
+  photoProfil?: string;
 }
 
 export interface MedecinResponse {
@@ -44,6 +48,10 @@ export class MedecinService {
           telephone: utilisateurs.telephone,
           adresse: utilisateurs.adresse,
           anneesExperience: medecins.anneesExperience,
+          description: medecins.description,
+          education: medecins.education,
+          specialisations: medecins.specialisations,
+          photoProfil: medecins.photoProfil,
         })
         .from(medecins)
         .innerJoin(utilisateurs, eq(medecins.id, utilisateurs.id))
@@ -66,11 +74,22 @@ export class MedecinService {
         }
 
         if (conditions.length > 0) {
-          query = query.where(and(eq(medecins.statutVerification, "valide"), or(...conditions)));
+          query = (query as any).where(and(eq(medecins.statutVerification, "valide"), or(...conditions)));
         }
       }
 
-      const medecinsValides = await query;
+      const medecinsValidesRaw = await query;
+
+      const medecinsValides = medecinsValidesRaw.map((m: any) => ({
+        ...m,
+        telephone: m.telephone ?? undefined,
+        adresse: m.adresse ?? undefined,
+        anneesExperience: m.anneesExperience ?? undefined,
+        description: m.description ?? undefined,
+        education: m.education ?? undefined,
+        specialisations: m.specialisations ?? undefined,
+        photoProfil: m.photoProfil ? m.photoProfil.replace(/\\/g, '/') : undefined,
+      }));
 
       return {
         success: true,
@@ -107,6 +126,10 @@ export class MedecinService {
           telephone: utilisateurs.telephone,
           adresse: utilisateurs.adresse,
           anneesExperience: medecins.anneesExperience,
+          description: medecins.description,
+          education: medecins.education,
+          specialisations: medecins.specialisations,
+          photoProfil: medecins.photoProfil,
         })
         .from(medecins)
         .innerJoin(utilisateurs, eq(medecins.id, utilisateurs.id))
@@ -123,7 +146,16 @@ export class MedecinService {
 
       return {
         success: true,
-        data: [medecin[0]],
+        data: [{
+          ...medecin[0],
+          telephone: medecin[0].telephone ?? undefined,
+          adresse: medecin[0].adresse ?? undefined,
+          anneesExperience: medecin[0].anneesExperience ?? undefined,
+          description: medecin[0].description ?? undefined,
+          education: medecin[0].education ?? undefined,
+          specialisations: medecin[0].specialisations ?? undefined,
+          photoProfil: medecin[0].photoProfil ? medecin[0].photoProfil.replace(/\\/g, '/') : undefined,
+        }],
       };
     } catch (error: any) {
       console.error("Erreur lors de la récupération du médecin:", error);

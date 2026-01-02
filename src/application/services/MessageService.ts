@@ -177,7 +177,7 @@ export class MessageService {
 
       // Déchiffrer tous les messages
       const formattedMessages = await Promise.all(
-        conversationMessages.map(async (msg) => {
+        conversationMessages.map(async (msg: any) => {
           try {
             const contenuDechiffre = await decryptMessage(msg.contenu);
             return {

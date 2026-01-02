@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { v4 as randomUUID } from "uuid";
 import { db } from "../../infrastructure/database/db";
-import { medecins, utilisateurs, messages, patients, administrateurs } from "../../infrastructure/database/schema";
+import { medecins, utilisateurs, messages, patients, administrateurs, historiqueValidations } from "../../infrastructure/database/schema";
 import { hashPassword } from "../../infrastructure/auth/hash";
 import { generatePassword, sendPasswordByEmail, sendRejectionEmailByEmail } from "../../infrastructure/auth/email2fa";
 
@@ -11,7 +11,7 @@ import { generatePassword, sendPasswordByEmail, sendRejectionEmailByEmail } from
 export interface AdminResponse {
   success: boolean;
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 /**
@@ -31,10 +31,103 @@ export interface MedecinEnAttente {
 }
 
 /**
+ * Interface pour l'historique des actions
+ */
+export interface HistoriqueAction {
+  id: string;
+  action: "validation" | "rejet" | "mise_en_attente";
+  statutAvant: string;
+  statutApres: string;
+  motif?: string;
+  dateAction: Date;
+  commentaireAdmin?: string;
+  adminNom: string;
+  adminEmail: string;
+}
+
+/**
+ * Interface pour les médecins avec historique
+ */
+export interface MedecinAvecHistorique extends MedecinEnAttente {
+  dateValidation?: Date;
+  motifRejet?: string;
+  adminValidateurNom?: string;
+  historique: HistoriqueAction[];
+}
+
+/**
  * Service d'administration
  * Gère la validation des médecins et autres tâches administratives
  */
 export class AdminService {
+  /**
+   * Enregistrer une action dans l'historique
+   */
+  private static async enregistrerHistorique(
+    medecinId: string,
+    adminId: string,
+    action: "validation" | "rejet" | "mise_en_attente",
+    statutAvant: string,
+    statutApres: string,
+    motif?: string,
+    commentaireAdmin?: string,
+    adresseIP?: string
+  ): Promise<void> {
+    try {
+      await db.insert(historiqueValidations).values({
+        id: randomUUID(),
+        medecinId,
+        adminId,
+        action,
+        statutAvant,
+        statutApres,
+        motif,
+        commentaireAdmin,
+        adresseIP,
+        dateAction: new Date(),
+      });
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement de l'historique:", error);
+      // Ne pas faire échouer l'opération principale si l'historique échoue
+    }
+  }
+
+  /**
+   * Récupérer l'historique d'un médecin
+   */
+  static async getHistoriqueMedecin(medecinId: string): Promise<AdminResponse> {
+    try {
+      const historique = await db
+        .select({
+          id: historiqueValidations.id,
+          action: historiqueValidations.action,
+          statutAvant: historiqueValidations.statutAvant,
+          statutApres: historiqueValidations.statutApres,
+          motif: historiqueValidations.motif,
+          dateAction: historiqueValidations.dateAction,
+          commentaireAdmin: historiqueValidations.commentaireAdmin,
+          adminNom: administrateurs.nom,
+          adminEmail: utilisateurs.mail,
+        })
+        .from(historiqueValidations)
+        .leftJoin(utilisateurs, eq(historiqueValidations.adminId, utilisateurs.id))
+        .leftJoin(administrateurs, eq(historiqueValidations.adminId, administrateurs.id))
+        .where(eq(historiqueValidations.medecinId, medecinId))
+        .orderBy(desc(historiqueValidations.dateAction));
+
+      return {
+        success: true,
+        message: "Historique récupéré avec succès",
+        data: historique
+      };
+    } catch (error) {
+      console.error("Erreur lors de la récupération de l'historique:", error);
+      return {
+        success: false,
+        message: "Erreur lors de la récupération de l'historique"
+      };
+    }
+  }
   /**
    * Récupérer tous les médecins en attente de validation
    */
@@ -72,9 +165,146 @@ export class AdminService {
   }
 
   /**
+   * Récupérer tous les médecins validés avec historique
+   */
+  static async getMedecinsValides(): Promise<AdminResponse> {
+    try {
+      const medecinsValides = await db
+        .select({
+          id: medecins.id,
+          nom: medecins.nom,
+          telephone: utilisateurs.telephone,
+          mail: utilisateurs.mail,
+          specialite: medecins.specialite,
+          numeroLicence: medecins.numeroLicence,
+          documentIdentite: medecins.documentIdentite,
+          diplome: medecins.diplome,
+          photoProfil: medecins.photoProfil,
+          dateCreation: utilisateurs.dateCreation,
+          dateValidation: medecins.dateValidation,
+          adminValidateurId: medecins.adminValidateurId,
+        })
+        .from(medecins)
+        .innerJoin(utilisateurs, eq(medecins.id, utilisateurs.id))
+        .where(eq(medecins.statutVerification, "valide"));
+
+      // Enrichir avec l'historique et les informations de l'admin validateur
+      const medecinsAvecHistorique = await Promise.all(
+        medecinsValides.map(async (medecin: any) => {
+          // Récupérer l'historique
+          const historiqueResult = await this.getHistoriqueMedecin(medecin.id);
+          const historique = historiqueResult.success ? historiqueResult.data : [];
+
+          // Récupérer le nom de l'admin validateur
+          let adminValidateurNom = "Administrateur supprimé";
+          if (medecin.adminValidateurId) {
+            const adminData = await db
+              .select({ nom: administrateurs.nom })
+              .from(administrateurs)
+              .where(eq(administrateurs.id, medecin.adminValidateurId))
+              .limit(1);
+            
+            if (adminData.length > 0) {
+              adminValidateurNom = adminData[0].nom;
+            }
+          }
+
+          return {
+            ...medecin,
+            adminValidateurNom,
+            historique
+          };
+        })
+      );
+
+      return {
+        success: true,
+        message: "Médecins validés récupérés avec succès",
+        data: medecinsAvecHistorique
+      };
+    } catch (error) {
+      console.error("Erreur lors de la récupération des médecins validés:", error);
+      console.error("Détails de l'erreur:", error instanceof Error ? error.message : String(error));
+      return {
+        success: false,
+        message: `Erreur lors de la récupération des médecins validés: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
+  }
+
+  /**
+   * Récupérer tous les médecins rejetés avec historique
+   */
+  static async getMedecinsRejetes(): Promise<AdminResponse> {
+    try {
+      const medecinsRejetes = await db
+        .select({
+          id: medecins.id,
+          nom: medecins.nom,
+          telephone: utilisateurs.telephone,
+          mail: utilisateurs.mail,
+          specialite: medecins.specialite,
+          numeroLicence: medecins.numeroLicence,
+          documentIdentite: medecins.documentIdentite,
+          diplome: medecins.diplome,
+          photoProfil: medecins.photoProfil,
+          dateCreation: utilisateurs.dateCreation,
+          dateValidation: medecins.dateValidation,
+          motifRejet: medecins.motifRejet,
+          adminValidateurId: medecins.adminValidateurId,
+        })
+        .from(medecins)
+        .innerJoin(utilisateurs, eq(medecins.id, utilisateurs.id))
+        .where(eq(medecins.statutVerification, "rejete"));
+
+      // Enrichir avec l'historique et les informations de l'admin validateur
+      const medecinsAvecHistorique = await Promise.all(
+        medecinsRejetes.map(async (medecin: any) => {
+          // Récupérer l'historique
+          const historiqueResult = await this.getHistoriqueMedecin(medecin.id);
+          const historique = historiqueResult.success ? historiqueResult.data : [];
+
+          // Récupérer le nom de l'admin validateur
+          let adminValidateurNom = "Administrateur supprimé";
+          if (medecin.adminValidateurId) {
+            const adminData = await db
+              .select({ nom: administrateurs.nom })
+              .from(administrateurs)
+              .where(eq(administrateurs.id, medecin.adminValidateurId))
+              .limit(1);
+            
+            if (adminData.length > 0) {
+              adminValidateurNom = adminData[0].nom;
+            }
+          }
+
+          return {
+            ...medecin,
+            adminValidateurNom,
+            historique
+          };
+        })
+      );
+
+      return {
+        success: true,
+        message: "Médecins rejetés récupérés avec succès",
+        data: medecinsAvecHistorique
+      };
+    } catch (error) {
+      console.error("Erreur lors de la récupération des médecins rejetés:", error);
+      console.error("Détails de l'erreur:", error instanceof Error ? error.message : String(error));
+      return {
+        success: false,
+        message: `Erreur lors de la récupération des médecins rejetés: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
+  }
+
+  /**
    * Valider un médecin
    */
-  static async validerMedecin(medecinId: string): Promise<AdminResponse> {
+  static async validerMedecin(medecinId: string, adminId?: string, adresseIP?: string): Promise<AdminResponse> {
     try {
       // Vérifier que le médecin existe et est en attente
       const medecinData = await db
@@ -96,6 +326,7 @@ export class AdminService {
 
       const medecin = medecinData[0].medecin;
       const utilisateur = medecinData[0].utilisateur;
+      const statutAvant = medecin.statutVerification;
 
       if (medecin.statutVerification !== "en_attente") {
         return {
@@ -108,16 +339,43 @@ export class AdminService {
       const newPassword = generatePassword(12);
       const hashedPassword = await hashPassword(newPassword);
 
+      console.log('🔐 ═══════════════════════════════════════════════════════════════');
+      console.log('🔐 VALIDATION DE MÉDECIN - NOUVEAU MOT DE PASSE GÉNÉRÉ');
+      console.log('🔐 ═══════════════════════════════════════════════════════════════');
+      console.log(`🔐 Médecin: ${medecin.nom}`);
+      console.log(`🔐 Email: ${utilisateur.mail}`);
+      console.log(`🔐 MOT DE PASSE NON-CRYPTÉ: ${newPassword}`);
+      console.log(`🔐 MOT DE PASSE CRYPTÉ: ${hashedPassword.substring(0, 30)}...`);
+      console.log('🔐 ═══════════════════════════════════════════════════════════════');
+
       // Mettre à jour le statut et le mot de passe
       await db
         .update(medecins)
-        .set({ statutVerification: "valide" })
+        .set({ 
+          statutVerification: "valide",
+          dateValidation: new Date(),
+          adminValidateurId: adminId
+        })
         .where(eq(medecins.id, medecinId));
 
       await db
         .update(utilisateurs)
         .set({ motDePasse: hashedPassword })
         .where(eq(utilisateurs.id, medecinId));
+
+      // Enregistrer l'action dans l'historique
+      if (adminId) {
+        await this.enregistrerHistorique(
+          medecinId,
+          adminId,
+          "validation",
+          statutAvant,
+          "valide",
+          "Médecin validé avec succès",
+          "Validation automatique avec génération de mot de passe",
+          adresseIP
+        );
+      }
 
       // Envoyer le mot de passe par email
       try {
@@ -143,7 +401,7 @@ export class AdminService {
   /**
    * Rejeter un médecin
    */
-  static async rejeterMedecin(medecinId: string, motif?: string): Promise<AdminResponse> {
+  static async rejeterMedecin(medecinId: string, motif?: string, adminId?: string, adresseIP?: string): Promise<AdminResponse> {
     try {
       // Vérifier que le médecin existe et est en attente
       const medecinData = await db
@@ -165,6 +423,7 @@ export class AdminService {
 
       const medecin = medecinData[0].medecin;
       const utilisateur = medecinData[0].utilisateur;
+      const statutAvant = medecin.statutVerification;
 
       if (medecin.statutVerification !== "en_attente") {
         return {
@@ -173,10 +432,34 @@ export class AdminService {
         };
       }
 
-      // Supprimer le médecin et l'utilisateur de la base de données
-      // La suppression de l'utilisateur supprimera automatiquement le médecin grâce au CASCADE
-      await db.delete(utilisateurs).where(eq(utilisateurs.id, medecinId));
-      console.log(`✅ Médecin ${medecin.nom} (ID: ${medecinId}) supprimé de la base de données`);
+      const motifFinal = motif || "Aucun motif spécifié";
+
+      // Mettre à jour le statut de rejet avec le motif
+      await db
+        .update(medecins)
+        .set({ 
+          statutVerification: "rejete",
+          motifRejet: motifFinal,
+          dateValidation: new Date(),
+          adminValidateurId: adminId
+        })
+        .where(eq(medecins.id, medecinId));
+
+      // Enregistrer l'action dans l'historique
+      if (adminId) {
+        await this.enregistrerHistorique(
+          medecinId,
+          adminId,
+          "rejet",
+          statutAvant,
+          "rejete",
+          motifFinal,
+          `Demande rejetée pour le motif: ${motifFinal}`,
+          adresseIP
+        );
+      }
+
+      console.log(`✅ Médecin ${medecin.nom} (ID: ${medecinId}) marqué comme rejeté`);
 
       // Envoyer un email de notification du rejet
       try {
@@ -184,7 +467,7 @@ export class AdminService {
           await sendRejectionEmailByEmail(
             utilisateur.mail,
             medecin.nom,
-            motif
+            motifFinal
           );
           console.log(`✅ Email de rejet envoyé à ${utilisateur.mail}`);
         } else {
@@ -197,11 +480,8 @@ export class AdminService {
 
       // Créer un message de notification du rejet dans la base de données
       try {
-        // Utiliser l'ID admin "system" ou créer un message sans expéditeur particulier
         const messageId = randomUUID();
-        const motifMessage = motif 
-          ? `Votre demande d'inscription a été rejetée.\n\nMotif du rejet: ${motif}`
-          : `Votre demande d'inscription a été rejetée.`;
+        const motifMessage = `Votre demande d'inscription a été rejetée.\n\nMotif du rejet: ${motifFinal}`;
 
         // Chercher un administrateur pour envoyer le message
         const admin = await db
@@ -228,13 +508,141 @@ export class AdminService {
 
       return {
         success: true,
-        message: `Médecin rejeté avec succès${motif ? `. Motif: ${motif}` : ""}`
+        message: `Médecin rejeté avec succès. Motif: ${motifFinal}`
       };
     } catch (error) {
       console.error("Erreur lors du rejet du médecin:", error);
       return {
         success: false,
         message: "Erreur lors du rejet du médecin"
+      };
+    }
+  }
+
+  /**
+   * Rechercher des médecins avec filtres
+   */
+  static async rechercherMedecins(filtres: {
+    statut?: string;
+    nom?: string;
+    specialite?: string;
+    numeroLicence?: string;
+    dateDebut?: string;
+    dateFin?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<AdminResponse> {
+    try {
+      const { statut, nom, specialite, numeroLicence, dateDebut: _dateDebut, dateFin: _dateFin, page = 1, limit = 10 } = filtres;
+      // Mark date filters as used to avoid "assigned but never used" warnings
+      void _dateDebut; // may be used later for advanced date filtering
+      void _dateFin; // may be used later for advanced date filtering
+      
+      let query = db
+        .select({
+          id: medecins.id,
+          nom: medecins.nom,
+          telephone: utilisateurs.telephone,
+          mail: utilisateurs.mail,
+          specialite: medecins.specialite,
+          numeroLicence: medecins.numeroLicence,
+          documentIdentite: medecins.documentIdentite,
+          diplome: medecins.diplome,
+          photoProfil: medecins.photoProfil,
+          dateCreation: utilisateurs.dateCreation,
+          dateValidation: medecins.dateValidation,
+          motifRejet: medecins.motifRejet,
+          statutVerification: medecins.statutVerification,
+          adminValidateurId: medecins.adminValidateurId,
+        })
+        .from(medecins)
+        .innerJoin(utilisateurs, eq(medecins.id, utilisateurs.id));
+
+      // Appliquer les filtres
+      const conditions = [];
+      
+      if (statut) {
+        conditions.push(eq(medecins.statutVerification, statut));
+      }
+      
+      if (nom) {
+        conditions.push(eq(medecins.nom, nom));
+      }
+      
+      if (specialite) {
+        conditions.push(eq(medecins.specialite, specialite));
+      }
+      
+      if (numeroLicence) {
+        conditions.push(eq(medecins.numeroLicence, numeroLicence));
+      }
+
+      if (conditions.length > 0) {
+        query = (query as unknown as { where: (...args: unknown[]) => typeof query }).where(and(...conditions));
+      }
+
+      // Pagination
+      const offset = (page - 1) * limit;
+      const resultats = await query.limit(limit).offset(offset);
+
+      // Compter le total pour la pagination
+      let countQuery = db
+        .select({ count: medecins.id })
+        .from(medecins)
+        .innerJoin(utilisateurs, eq(medecins.id, utilisateurs.id));
+
+      if (conditions.length > 0) {
+        countQuery = (countQuery as unknown as { where: (...args: unknown[]) => typeof countQuery }).where(and(...conditions));
+      }
+
+      const totalCount = await countQuery;
+      const total = totalCount.length;
+
+      // Enrichir avec l'historique
+      const resultatsAvecHistorique = await Promise.all(
+        resultats.map(async (medecin: any) => {
+          const historiqueResult = await this.getHistoriqueMedecin(medecin.id);
+          const historique = historiqueResult.success ? historiqueResult.data : [];
+
+          let adminValidateurNom = "Aucun";
+          if (medecin.adminValidateurId) {
+            const adminData = await db
+              .select({ nom: administrateurs.nom })
+              .from(administrateurs)
+              .where(eq(administrateurs.id, medecin.adminValidateurId))
+              .limit(1);
+            
+            if (adminData.length > 0) {
+              adminValidateurNom = adminData[0].nom;
+            }
+          }
+
+          return {
+            ...medecin,
+            adminValidateurNom,
+            historique
+          };
+        })
+      );
+
+      return {
+        success: true,
+        message: "Recherche effectuée avec succès",
+        data: {
+          medecins: resultatsAvecHistorique,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit)
+          }
+        }
+      };
+    } catch (error) {
+      console.error("Erreur lors de la recherche:", error);
+      return {
+        success: false,
+        message: "Erreur lors de la recherche"
       };
     }
   }
@@ -293,9 +701,10 @@ export class AdminService {
       };
     } catch (error) {
       console.error("Erreur lors de la récupération des statistiques:", error);
+      console.error("Détails de l'erreur:", error instanceof Error ? error.message : String(error));
       return {
         success: false,
-        message: "Erreur lors de la récupération des statistiques"
+        message: `Erreur lors de la récupération des statistiques: ${error instanceof Error ? error.message : String(error)}`
       };
     }
   }
@@ -344,7 +753,7 @@ export class AdminService {
 
       // Pour chaque utilisateur, récupérer le nom depuis la table appropriée
       const usersWithNames = await Promise.all(
-        allUsers.map(async (user) => {
+        allUsers.map(async (user: any) => {
           let nom = null;
           
           if (user.typeUtilisateur === "patient") {

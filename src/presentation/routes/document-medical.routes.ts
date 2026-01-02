@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { DocumentMedicalController } from "../controllers/DocumentMedicalController";
 import { upload } from "../../infrastructure/storage/fileStorage";
 import { authenticateToken } from "../../infrastructure/auth/middleware";
@@ -9,7 +9,7 @@ import { authenticateToken } from "../../infrastructure/auth/middleware";
 const router = Router();
 
 // Middleware de logging pour toutes les requêtes vers ce router
-router.use((req: Request, res: Response, next: NextFunction) => {
+router.use((req: Request, _res: Response, next: NextFunction) => {
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'document-medical.routes.ts:12',message:'Router middleware - request received',data:{path:req.path,url:req.url,method:req.method,originalUrl:req.originalUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
   // #endregion
@@ -38,12 +38,12 @@ router.get("/", authenticateToken, (req: Request, res: Response) => {
 router.post(
   "/",
   authenticateToken,
-  (req, res, next) => {
+  (req: Request, res: Response, next: NextFunction) => {
     console.log(`[UPLOAD] POST /api/documents-medicaux - Content-Type: ${req.headers["content-type"]}`);
     next();
   },
   upload.single("fichier"),
-  (err: any, req: any, res: any, next: any) => {
+  (err: any, _req: any, res: any, _next: any) => {
     // Gestion des erreurs multer
     if (err) {
       console.error("[UPLOAD] Multer error:", err);
@@ -64,7 +64,7 @@ router.post(
         message: err.message,
       });
     }
-    next();
+    _next();
   },
   DocumentMedicalController.createDocument
 );

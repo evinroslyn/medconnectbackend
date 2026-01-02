@@ -75,7 +75,7 @@ export class Patient extends Utilisateur {
    * @param motDePasse - Mot de passe en clair
    * @returns true si l'authentification réussit
    */
-  async authentifier(mail: string, motDePasse: string): Promise<boolean> {
+  async authentifier(mail: string, _motDePasse: string): Promise<boolean> {
     // Cette méthode sera implémentée dans la couche service
     // La vérification du mot de passe sera gérée par le service d'authentification
     return this.mail === mail;
@@ -92,7 +92,7 @@ export class Patient extends Utilisateur {
    * Téléverse un nouveau dossier médical
    * @param dossier - Dossier médical à téléverser
    */
-  televerserDossierMedical(dossier: DossierMedical): void {
+  televerserDossierMedical(_dossier: DossierMedical): void {
     // Cette méthode sera implémentée dans la couche service
   }
 
@@ -101,7 +101,7 @@ export class Patient extends Utilisateur {
    * @param idDossier - Identifiant du dossier à catégoriser
    * @param type - Type d'enregistrement à attribuer
    */
-  categoriserDossier(idDossier: string, type: TypeEnregistrement): void {
+  categoriserDossier(_idDossier: string, _type: TypeEnregistrement): void {
     // Cette méthode sera implémentée dans la couche service
   }
 
@@ -110,7 +110,7 @@ export class Patient extends Utilisateur {
    * @param idDossier - Identifiant du dossier
    * @param description - Description à ajouter
    */
-  ajouterDescriptionDossier(idDossier: string, description: string): void {
+  ajouterDescriptionDossier(_idDossier: string, _description: string): void {
     // Cette méthode sera implémentée dans la couche service
   }
 
@@ -119,7 +119,7 @@ export class Patient extends Utilisateur {
    * @param specialisation - Spécialité recherchée
    * @returns Liste des médecins correspondants
    */
-  rechercherMedecins(specialisation: string): Medecin[] {
+  rechercherMedecins(_specialisation: string): Medecin[] {
     // Cette méthode sera implémentée dans la couche service
     return [];
   }
@@ -129,7 +129,7 @@ export class Patient extends Utilisateur {
    * @param idMedecin - Identifiant du médecin
    * @returns Connexion créée
    */
-  envoyerDemandeConnexion(idMedecin: string): Connexion {
+  envoyerDemandeConnexion(_idMedecin: string): Connexion {
     // Cette méthode sera implémentée dans la couche service
     return {} as Connexion;
   }
@@ -139,7 +139,7 @@ export class Patient extends Utilisateur {
    * @param idMedecin - Identifiant du médecin
    * @param niveau - Niveau d'accès à accorder
    */
-  accorderAcces(idMedecin: string, niveau: NiveauAcces): void {
+  accorderAcces(_idMedecin: string, _niveau: NiveauAcces): void {
     // Cette méthode sera implémentée dans la couche service
   }
 
@@ -147,7 +147,7 @@ export class Patient extends Utilisateur {
    * Révoque l'accès d'un médecin
    * @param idMedecin - Identifiant du médecin
    */
-  revoquerAcces(idMedecin: string): void {
+  revoquerAcces(_idMedecin: string): void {
     // Cette méthode sera implémentée dans la couche service
   }
 
@@ -156,7 +156,7 @@ export class Patient extends Utilisateur {
    * @param idDossier - Identifiant du dossier à partager
    * @param idMedecin - Identifiant du médecin
    */
-  partagerDossier(idDossier: string, idMedecin: string): void {
+  partagerDossier(_idDossier: string, _idMedecin: string): void {
     // Cette méthode sera implémentée dans la couche service
   }
 
@@ -165,7 +165,7 @@ export class Patient extends Utilisateur {
    * @param destinataire - Identifiant du destinataire
    * @param contenu - Contenu du message
    */
-  envoyerMessage(destinataire: string, contenu: string): Message {
+  envoyerMessage(_destinataire: string, _contenu: string): Message {
     // Cette méthode sera implémentée dans la couche service
     return {} as Message;
   }

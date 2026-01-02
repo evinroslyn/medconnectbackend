@@ -70,7 +70,7 @@ export class RendezVousService {
         .orderBy(desc(disponibilites.jour));
 
       // Convertir les données pour le format attendu par le frontend
-      const disponibilitesFormatted = result.map((d) => ({
+      const disponibilitesFormatted = result.map((d: any) => ({
         id: d.id,
         idMedecin: d.idMedecin,
         jour: d.jour instanceof Date 
@@ -137,7 +137,7 @@ export class RendezVousService {
       console.log("[RendezVousService] getAllDisponibilitesActives - Nombre de résultats:", result.length);
 
       // Filtrer les disponibilités passées après récupération
-      const filtered = result.filter((d) => {
+      const filtered = result.filter((d: any) => {
         const disponibiliteDate = d.jour instanceof Date 
           ? d.jour 
           : new Date(d.jour);
@@ -147,7 +147,7 @@ export class RendezVousService {
       console.log("[RendezVousService] getAllDisponibilitesActives - Après filtrage:", filtered.length);
 
       // Récupérer tous les rendez-vous futurs planifiés pour les médecins concernés
-      const medecinIds = Array.from(new Set(filtered.map((d) => d.idMedecin)));
+      const medecinIds = Array.from(new Set(filtered.map((d: any) => d.idMedecin))) as string[];
 
       let futureRendezVousList:
         { idMedecin: string; date: Date; statut: string }[] = [];
@@ -170,7 +170,7 @@ export class RendezVousService {
       }
 
       // Convertir les données pour le format attendu par le frontend
-      const disponibilitesFormatted = filtered.map((d) => ({
+      const disponibilitesFormatted = filtered.map((d: any) => ({
         id: d.id,
         idMedecin: d.idMedecin,
         jour: d.jour instanceof Date

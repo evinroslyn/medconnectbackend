@@ -108,6 +108,17 @@ export class AuthService {
         // Générer un mot de passe temporaire qui sera remplacé lors de la validation
         const tempPassword = generatePassword(16);
         hashedPassword = await hashPassword(tempPassword);
+        
+        console.log('👨‍⚕️ ═══════════════════════════════════════════════════════════════');
+        console.log('👨‍⚕️ CRÉATION DE MÉDECIN - MOT DE PASSE TEMPORAIRE GÉNÉRÉ');
+        console.log('👨‍⚕️ ═══════════════════════════════════════════════════════════════');
+        console.log(`👨‍⚕️ Nom: ${userData.nom}`);
+        console.log(`👨‍⚕️ Email: ${userData.mail}`);
+        console.log(`👨‍⚕️ Spécialité: ${userData.specialite}`);
+        console.log(`👨‍⚕️ MOT DE PASSE TEMPORAIRE NON-CRYPTÉ: ${tempPassword}`);
+        console.log(`👨‍⚕️ MOT DE PASSE TEMPORAIRE CRYPTÉ: ${hashedPassword.substring(0, 30)}...`);
+        console.log('👨‍⚕️ ⚠️  Ce mot de passe sera remplacé lors de la validation par l\'admin');
+        console.log('👨‍⚕️ ═══════════════════════════════════════════════════════════════');
       } else {
         // Valider le mot de passe pour les patients et administrateurs
         if (!userData.motDePasse) {
@@ -729,6 +740,9 @@ export class AuthService {
         if (medecinData.length > 0) {
           userProfile.specialite = medecinData[0].specialite;
           userProfile.numeroLicence = medecinData[0].numeroLicence;
+          userProfile.description = medecinData[0].description || null;
+          userProfile.education = medecinData[0].education || null;
+          userProfile.specialisations = medecinData[0].specialisations || null;
           // Normaliser le chemin de la photo de profil (remplacer les backslashes par des slashes)
           const photoProfil = medecinData[0].photoProfil;
           userProfile.photoProfil = photoProfil ? photoProfil.replace(/\\/g, '/') : null;
@@ -764,6 +778,9 @@ export class AuthService {
       dateNaissance?: string;
       genre?: "Homme" | "Femme" | "Autre";
       specialite?: string;
+      description?: string;
+      education?: string;
+      specialisations?: string;
     }
   ): Promise<{
     success: boolean;
@@ -853,6 +870,15 @@ export class AuthService {
         }
         if (updates.specialite !== undefined) {
           medecinUpdates.specialite = updates.specialite;
+        }
+        if (updates.description !== undefined) {
+          medecinUpdates.description = updates.description || null;
+        }
+        if (updates.education !== undefined) {
+          medecinUpdates.education = updates.education || null;
+        }
+        if (updates.specialisations !== undefined) {
+          medecinUpdates.specialisations = updates.specialisations || null;
         }
 
         if (Object.keys(medecinUpdates).length > 0) {

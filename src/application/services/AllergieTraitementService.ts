@@ -19,7 +19,7 @@ export class AllergieTraitementService {
       .where(eq(allergies.idPatient, idPatient));
 
     return result.map(
-      (a) =>
+      (a: any) =>
         new Allergie(
           a.id,
           a.nom,
@@ -146,7 +146,7 @@ export class AllergieTraitementService {
    * Supprime une allergie
    */
   static async deleteAllergie(id: string): Promise<boolean> {
-    const result = await db.delete(allergies).where(eq(allergies.id, id));
+    await db.delete(allergies).where(eq(allergies.id, id));
     return true;
   }
 
@@ -161,7 +161,7 @@ export class AllergieTraitementService {
       .orderBy(traitements.dateDebut);
 
     return result.map(
-      (t) =>
+      (t: any) =>
         new Traitement(
           t.id,
           t.idPatient,

@@ -40,7 +40,7 @@ export class Administrateur extends Utilisateur {
    * @param motDePasse - Mot de passe en clair
    * @returns true si l'authentification réussit
    */
-  async authentifier(mail: string, motDePasse: string): Promise<boolean> {
+  async authentifier(mail: string, _motDePasse: string): Promise<boolean> {
     // Cette méthode sera implémentée dans la couche service
     return this.mail === mail;
   }

@@ -40,6 +40,20 @@ router.get("/utilisateurs", AdminController.getAllUsers);
 router.get("/medecins/en-attente", AdminController.getMedecinsEnAttente);
 
 /**
+ * @route GET /api/admin/medecins/valides
+ * @desc Récupérer tous les médecins validés
+ * @access Admin
+ */
+router.get("/medecins/valides", AdminController.getMedecinsValides);
+
+/**
+ * @route GET /api/admin/medecins/rejetes
+ * @desc Récupérer tous les médecins rejetés
+ * @access Admin
+ */
+router.get("/medecins/rejetes", AdminController.getMedecinsRejetes);
+
+/**
  * @route PATCH /api/admin/medecins/:medecinId/valider
  * @desc Valider un médecin
  * @access Admin
@@ -52,5 +66,19 @@ router.patch("/medecins/:medecinId/valider", AdminController.validerMedecin);
  * @access Admin
  */
 router.patch("/medecins/:medecinId/rejeter", rejeterMedecinValidators, AdminController.rejeterMedecin);
+
+/**
+ * @route GET /api/admin/medecins/:medecinId/historique
+ * @desc Récupérer l'historique d'un médecin
+ * @access Admin
+ */
+router.get("/medecins/:medecinId/historique", AdminController.getHistoriqueMedecin);
+
+/**
+ * @route GET /api/admin/medecins/rechercher
+ * @desc Rechercher des médecins avec filtres
+ * @access Admin
+ */
+router.get("/medecins/rechercher", AdminController.rechercherMedecins);
 
 export default router;

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { DocumentMedicalService } from "../../application/services/DocumentMedicalService";
 import { FileStorageService } from "../../infrastructure/storage/fileStorage";
-import { TypeEnregistrement } from "../../domain/enums";
+import { TypeEnregistrement } from "../../domain/enums/TypeEnregistrement";
 
 /**
  * Contrôleur pour la gestion des documents médicaux

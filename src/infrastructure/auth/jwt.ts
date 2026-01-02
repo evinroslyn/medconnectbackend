@@ -27,11 +27,12 @@ export function generateToken(payload: Omit<JWTPayload, "iat" | "exp">): string 
 
   const expiresIn = process.env.JWT_EXPIRES_IN || "24h";
 
-  return jwt.sign(payload, secret, {
-    expiresIn,
+  return jwt.sign(payload as JWTPayload, secret as jwt.Secret, {
+    expiresIn: expiresIn as unknown as jwt.SignOptions["expiresIn"],
     issuer: "med-connect",
     audience: "med-connect-api",
-  });
+  } as jwt.SignOptions);
+
 }
 
 /**
@@ -47,7 +48,7 @@ export function verifyToken(token: string): JWTPayload {
   }
 
   try {
-    const decoded = jwt.verify(token, secret, {
+    const decoded = jwt.verify(token, secret as any, {
       issuer: "med-connect",
       audience: "med-connect-api",
     }) as JWTPayload;

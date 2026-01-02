@@ -1,8 +1,6 @@
-import { mysqlTable, varchar, text, timestamp, mysqlEnum, boolean } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, timestamp, mysqlEnum, boolean } from "drizzle-orm/mysql-core";
 import { medecins } from "./medecins";
 import { patients } from "./patients";
-import { dossiersMedicaux } from "./dossiersMedicaux";
-import { documentsMedicaux } from "./documentsMedicaux";
 import { relations } from "drizzle-orm";
 
 /**

@@ -18,4 +18,5 @@ export * from "./rendezVous";
 export * from "./disponibilites";
 export * from "./messages";
 export * from "./partagesMedicaux";
+export * from "./historiqueValidations";
 

@@ -1,5 +1,25 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken, extractTokenFromHeader, JWTPayload } from "./jwt";
+import { db } from "../database/db";
+import { utilisateurs } from "../database/schema/utilisateurs";
+import { eq } from "drizzle-orm";
+
+/**
+ * Met à jour la dernière connexion d'un utilisateur
+ */
+async function updateUserLastSeen(userId: string): Promise<void> {
+  try {
+    await db
+      .update(utilisateurs)
+      .set({
+        derniereConnexion: new Date(),
+      })
+      .where(eq(utilisateurs.id, userId));
+  } catch (error) {
+    // Ignorer les erreurs silencieusement pour ne pas affecter la requête principale
+    console.warn('Erreur lors de la mise à jour de derniereConnexion:', error);
+  }
+}
 
 /**
  * Interface pour étendre Request avec les informations utilisateur
@@ -41,6 +61,12 @@ export function authenticateToken(
 
     const payload = verifyToken(token);
     req.user = payload;
+    
+    // Mettre à jour la dernière connexion automatiquement
+    updateUserLastSeen(payload.userId).catch(error => {
+      console.warn('Erreur lors de la mise à jour de la dernière connexion:', error);
+    });
+    
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'middleware.ts:37',message:'Token verified, calling next',data:{path:req.path,userId:payload.userId,userType:payload.typeUtilisateur},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
     // #endregion

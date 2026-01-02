@@ -7,7 +7,7 @@ export interface PatientInfo {
   id: string;
   nom: string;
   mail: string;
-  telephone: string;
+  telephone?: string;
   dateNaissance?: string;
   genre?: "Homme" | "Femme" | "Autre";
   adresse?: string;
@@ -63,7 +63,7 @@ export class PatientService {
           id: p.id,
           nom: p.nom,
           mail: p.mail,
-          telephone: p.telephone,
+          telephone: p.telephone ?? undefined,
           dateNaissance: p.dateNaissance ? new Date(p.dateNaissance).toISOString().split('T')[0] : undefined,
           genre: p.genre as "Homme" | "Femme" | "Autre" | undefined,
           adresse: p.adresse || undefined,

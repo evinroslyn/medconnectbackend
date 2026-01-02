@@ -1,4 +1,4 @@
-import { mysqlTable, varchar } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, timestamp, text } from "drizzle-orm/mysql-core";
 import { utilisateurs } from "./utilisateurs";
 import { relations } from "drizzle-orm";
 
@@ -20,6 +20,14 @@ export const medecins = mysqlTable("medecins", {
   diplome: varchar("diplome", { length: 500 }), // Chemin vers le diplôme
   photoProfil: varchar("photo_profil", { length: 500 }), // Chemin vers la photo de profil
   anneesExperience: varchar("annees_experience", { length: 10 }), // Nombre d'années d'expérience
+  description: text("description"), // Description personnelle du médecin
+  education: text("education"), // Éducation et formations du médecin
+  specialisations: text("specialisations"), // Spécialisations médicales
+  // Champs pour le suivi des demandes
+  dateValidation: timestamp("date_validation"), // Date de validation/rejet
+  motifRejet: text("motif_rejet"), // Motif détaillé du rejet
+  adminValidateurId: varchar("admin_validateur_id", { length: 255 }).references(() => utilisateurs.id), // ID de l'admin qui a traité la demande
+  historiqueActions: text("historique_actions"), // JSON des actions effectuées
 });
 
 /**

@@ -1,42 +1,113 @@
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 import * as dotenv from "dotenv";
 import * as schema from "./schema";
+
+// MySQL
+import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
+
+// Postgres
+import { Pool as PgPool } from "pg";
+import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
+
+import fs from "fs";
+import path from "path";
 
 dotenv.config();
 
 /**
- * Configuration de connexion MySQL
+ * Parse DATABASE_URL si disponible, sinon utilise les variables individuelles
  */
-const connectionConfig = {
-  host: process.env.DB_HOST || "localhost",
-  port: parseInt(process.env.DB_PORT || "3306"),
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "root",
-  database: process.env.DB_NAME || "meedconnect",
-  multipleStatements: true,
-};
+function parseDatabaseUrl(): {
+  protocol: string | null;
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+} {
+  if (process.env.DATABASE_URL) {
+    try {
+      const url = new URL(process.env.DATABASE_URL);
+      return {
+        protocol: url.protocol ? url.protocol.replace(":", "") : null,
+        host: url.hostname,
+        port: parseInt(url.port || (url.protocol && url.protocol.startsWith("postgres") ? "5432" : "3306")),
+        user: url.username,
+        password: url.password,
+        database: url.pathname.replace(/^\//, ""),
+      };
+    } catch (error) {
+      console.error("❌ Erreur lors du parsing de DATABASE_URL:", error);
+      console.log("⚠️  Utilisation des variables individuelles à la place");
+    }
+  }
 
-/**
- * Pool de connexions MySQL
- */
-const pool = mysql.createPool(connectionConfig);
+  // Fallback (MySQL defaults)
+  return {
+    protocol: null,
+    host: process.env.DB_HOST || "localhost",
+    port: parseInt(process.env.DB_PORT || "3306"),
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASSWORD || "root",
+    database: process.env.DB_NAME || "meedconnect",
+  };
+}
 
-/**
- * Instance Drizzle ORM configurée avec MySQL et les schémas
- */
-export const db = drizzle(pool, { schema, mode: "default" });
+const parsed = parseDatabaseUrl();
+const isPostgres = parsed.protocol === "postgres" || parsed.protocol === "postgresql";
+
+let db: any;
+let dbClient: any;
+
+if (isPostgres) {
+  const pool = new PgPool({ connectionString: process.env.DATABASE_URL, max: 10 });
+  dbClient = pool;
+  db = drizzlePg(pool, { schema });
+  console.log("🔌 Utilisation de PostgreSQL pour la base de données");
+} else {
+  const connectionConfig = {
+    host: parsed.host,
+    port: parsed.port,
+    user: parsed.user,
+    password: parsed.password,
+    database: parsed.database,
+    multipleStatements: true,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
+  };
+  const pool = mysql.createPool(connectionConfig);
+  dbClient = pool;
+  db = drizzleMysql(pool, { schema, mode: "default" });
+  console.log("🔌 Utilisation de MySQL pour la base de données");
+}
+
+export { db };
+
 
 /**
  * Fonction pour tester la connexion à la base de données
  */
 export async function testConnection(): Promise<void> {
   try {
-    const connection = await pool.getConnection();
-    console.log("✅ Connexion MySQL établie avec succès");
-    connection.release();
+    if (isPostgres) {
+      const client = await dbClient.connect();
+      await client.query("SELECT 1");
+      client.release();
+      console.log("✅ Connexion PostgreSQL établie avec succès");
+    } else {
+      const connection = await dbClient.getConnection();
+      try {
+        await connection.query("SELECT 1");
+      } finally {
+        connection.release();
+      }
+      console.log("✅ Connexion MySQL établie avec succès");
+    }
   } catch (error) {
-    console.error("❌ Erreur de connexion MySQL:", error);
+    console.error("❌ Erreur de connexion à la base de données:", error);
     throw error;
   }
 }
@@ -46,7 +117,35 @@ export async function testConnection(): Promise<void> {
  */
 export async function createTablesIfNotExists(): Promise<void> {
   try {
-    const connection = await pool.getConnection();
+    if (isPostgres) {
+      console.log("📊 Initialisation PostgreSQL via init_all_pg.sql...");
+      const sqlFile = path.join(__dirname, "../../../drizzle/init_all_pg.sql");
+      if (!fs.existsSync(sqlFile)) {
+        throw new Error(`Fichier SQL d'initialisation introuvable: ${sqlFile}`);
+      }
+      const sql = fs.readFileSync(sqlFile, "utf-8");
+
+      const client = await dbClient.connect();
+      try {
+        await client.query(sql);
+        console.log("✅ Schéma PostgreSQL exécuté avec succès");
+      } finally {
+        client.release();
+      }
+
+      // Créer l'administrateur par défaut si nécessaire
+      try {
+        const { createDefaultAdmin } = await import("./create-default-admin");
+        await createDefaultAdmin();
+      } catch (error: any) {
+        console.error("❌ Erreur lors de la création de l'administrateur par défaut:", error.message);
+      }
+
+      return;
+    }
+
+    // === MySQL path (existing logic) ===
+    const connection = await dbClient.getConnection();
     
     console.log("📊 Création des tables si nécessaire...");
     
@@ -155,100 +254,6 @@ export async function createTablesIfNotExists(): Promise<void> {
         date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
         FOREIGN KEY (id_medecin) REFERENCES medecins(id) ON DELETE CASCADE
       )`,
-      
-      // Table ordonnances
-      `CREATE TABLE IF NOT EXISTS ordonnances (
-        id VARCHAR(255) PRIMARY KEY,
-        id_dossier_medical VARCHAR(255),
-        id_medecin VARCHAR(255) NOT NULL,
-        contenu TEXT NOT NULL,
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (id_dossier_medical) REFERENCES dossiers_medicaux(id) ON DELETE CASCADE,
-        FOREIGN KEY (id_medecin) REFERENCES medecins(id) ON DELETE CASCADE
-      )`,
-      
-      // Table documents_medicaux
-      `CREATE TABLE IF NOT EXISTS documents_medicaux (
-        id VARCHAR(255) PRIMARY KEY,
-        id_dossier_medical VARCHAR(255) NOT NULL,
-        id_patient VARCHAR(255) NOT NULL,
-        nom VARCHAR(255) NOT NULL,
-        type ENUM('Resultat_Labo', 'Radio', 'Ordonnance', 'Notes', 'Diagnostic', 'Imagerie', 'examen') NOT NULL,
-        chemin_fichier TEXT,
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        description TEXT,
-        FOREIGN KEY (id_dossier_medical) REFERENCES dossiers_medicaux(id) ON DELETE CASCADE,
-        FOREIGN KEY (id_patient) REFERENCES patients(id) ON DELETE CASCADE
-      )`,
-      
-      // Table commentaires
-      `CREATE TABLE IF NOT EXISTS commentaires (
-        id VARCHAR(255) PRIMARY KEY,
-        id_dossier_medical VARCHAR(255) NOT NULL,
-        id_document_medical VARCHAR(255) NULL,
-        id_medecin VARCHAR(255) NOT NULL,
-        contenu TEXT NOT NULL,
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (id_dossier_medical) REFERENCES dossiers_medicaux(id) ON DELETE CASCADE,
-        FOREIGN KEY (id_document_medical) REFERENCES documents_medicaux(id) ON DELETE CASCADE,
-        FOREIGN KEY (id_medecin) REFERENCES medecins(id) ON DELETE CASCADE
-      )`,
-      // Migration : Ajouter la colonne id_document_medical si elle n'existe pas (sera gérée dans les migrations)
-      
-      // Table allergies
-      `CREATE TABLE IF NOT EXISTS allergies (
-        id VARCHAR(255) PRIMARY KEY,
-        id_dossier_medical VARCHAR(255),
-        id_patient VARCHAR(255) NOT NULL,
-        nom VARCHAR(255) NOT NULL,
-        description TEXT,
-        date_decouverte TIMESTAMP,
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (id_dossier_medical) REFERENCES dossiers_medicaux(id) ON DELETE CASCADE,
-        FOREIGN KEY (id_patient) REFERENCES patients(id) ON DELETE CASCADE
-      )`,
-      
-      // Table traitements
-      `CREATE TABLE IF NOT EXISTS traitements (
-        id VARCHAR(255) PRIMARY KEY,
-        id_patient VARCHAR(255) NOT NULL,
-        nom VARCHAR(255) NOT NULL,
-        description TEXT,
-        date_debut DATE NOT NULL,
-        date_fin DATE,
-        posologie TEXT,
-        medecin_prescripteur VARCHAR(255),
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (id_patient) REFERENCES patients(id) ON DELETE CASCADE
-      )`,
-      
-      // Table messages
-      `CREATE TABLE IF NOT EXISTS messages (
-        id VARCHAR(255) PRIMARY KEY,
-        id_expediteur VARCHAR(255) NOT NULL,
-        id_destinataire VARCHAR(255) NOT NULL,
-        contenu TEXT NOT NULL,
-        date_envoi TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        lu BOOLEAN DEFAULT FALSE NOT NULL,
-        FOREIGN KEY (id_expediteur) REFERENCES utilisateurs(id) ON DELETE CASCADE,
-        FOREIGN KEY (id_destinataire) REFERENCES utilisateurs(id) ON DELETE CASCADE
-      )`,
-      
-      // Table partages_medicaux
-      `CREATE TABLE IF NOT EXISTS partages_medicaux (
-        id VARCHAR(255) PRIMARY KEY,
-        id_patient VARCHAR(255) NOT NULL,
-        id_medecin VARCHAR(255) NOT NULL,
-        type_ressource ENUM('dossier', 'document') NOT NULL,
-        id_ressource VARCHAR(255) NOT NULL,
-        peut_telecharger BOOLEAN DEFAULT FALSE NOT NULL,
-        peut_screenshot BOOLEAN DEFAULT FALSE NOT NULL,
-        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        date_expiration TIMESTAMP NULL,
-        statut ENUM('actif', 'revoke', 'expire') DEFAULT 'actif' NOT NULL,
-        FOREIGN KEY (id_patient) REFERENCES patients(id) ON DELETE CASCADE,
-        FOREIGN KEY (id_medecin) REFERENCES medecins(id) ON DELETE CASCADE
-      )`
     ];
     
     for (const query of createTableQueries) {
@@ -508,6 +513,172 @@ export async function createTablesIfNotExists(): Promise<void> {
       console.error(`❌ Erreur lors de la migration 'date_decouverte' pour allergies: ${error.message}`);
     }
     
+    // Migration pour ajouter les colonnes description, education, specialisations à medecins
+    try {
+      const [medecinsDescColumns]: any = await connection.query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'medecins' 
+         AND COLUMN_NAME = 'description'`
+      );
+      
+      if (medecinsDescColumns.length === 0) {
+        await connection.query(
+          `ALTER TABLE medecins ADD COLUMN description TEXT NULL`
+        );
+        console.log("✅ Migration 'description' ajoutée à medecins");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la migration 'description' medecins: ${error.message}`);
+    }
+    
+    try {
+      const [medecinsEduColumns]: any = await connection.query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'medecins' 
+         AND COLUMN_NAME = 'education'`
+      );
+      
+      if (medecinsEduColumns.length === 0) {
+        await connection.query(
+          `ALTER TABLE medecins ADD COLUMN education TEXT NULL`
+        );
+        console.log("✅ Migration 'education' ajoutée à medecins");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la migration 'education' medecins: ${error.message}`);
+    }
+    
+    try {
+      const [medecinsSpecColumns]: any = await connection.query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'medecins' 
+         AND COLUMN_NAME = 'specialisations'`
+      );
+      
+      if (medecinsSpecColumns.length === 0) {
+        await connection.query(
+          `ALTER TABLE medecins ADD COLUMN specialisations TEXT NULL`
+        );
+        console.log("✅ Migration 'specialisations' ajoutée à medecins");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la migration 'specialisations' medecins: ${error.message}`);
+    }
+    
+    // Migration pour ajouter la colonne date_validation à medecins
+    try {
+      const [dateValidationColumns]: any = await connection.query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'medecins' 
+         AND COLUMN_NAME = 'date_validation'`
+      );
+      
+      if (dateValidationColumns.length === 0) {
+        await connection.query(
+          `ALTER TABLE medecins ADD COLUMN date_validation TIMESTAMP NULL`
+        );
+        console.log("✅ Migration 'date_validation' ajoutée à medecins");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la migration 'date_validation' medecins: ${error.message}`);
+    }
+    
+    // Migration pour ajouter la colonne motif_rejet à medecins
+    try {
+      const [motifRejetColumns]: any = await connection.query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'medecins' 
+         AND COLUMN_NAME = 'motif_rejet'`
+      );
+      
+      if (motifRejetColumns.length === 0) {
+        await connection.query(
+          `ALTER TABLE medecins ADD COLUMN motif_rejet TEXT NULL`
+        );
+        console.log("✅ Migration 'motif_rejet' ajoutée à medecins");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la migration 'motif_rejet' medecins: ${error.message}`);
+    }
+    
+    // Migration pour ajouter la colonne admin_validateur_id à medecins
+    try {
+      const [adminValidateurColumns]: any = await connection.query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'medecins' 
+         AND COLUMN_NAME = 'admin_validateur_id'`
+      );
+      
+      if (adminValidateurColumns.length === 0) {
+        await connection.query(
+          `ALTER TABLE medecins ADD COLUMN admin_validateur_id VARCHAR(255) NULL,
+           ADD CONSTRAINT fk_admin_validateur FOREIGN KEY (admin_validateur_id) REFERENCES utilisateurs(id) ON DELETE SET NULL`
+        );
+        console.log("✅ Migration 'admin_validateur_id' ajoutée à medecins");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la migration 'admin_validateur_id' medecins: ${error.message}`);
+    }
+    
+    // Migration pour ajouter la colonne historique_actions à medecins
+    try {
+      const [historiqueActionsColumns]: any = await connection.query(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'medecins' 
+         AND COLUMN_NAME = 'historique_actions'`
+      );
+      
+      if (historiqueActionsColumns.length === 0) {
+        await connection.query(
+          `ALTER TABLE medecins ADD COLUMN historique_actions TEXT NULL`
+        );
+        console.log("✅ Migration 'historique_actions' ajoutée à medecins");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la migration 'historique_actions' medecins: ${error.message}`);
+    }
+    
+    // Migration pour créer la table historique_validations si elle n'existe pas
+    try {
+      const [tables]: any = await connection.query(
+        `SELECT TABLE_NAME FROM information_schema.TABLES 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'historique_validations'`
+      );
+      
+      if (tables.length === 0) {
+        await connection.query(
+          `CREATE TABLE historique_validations (
+            id VARCHAR(255) PRIMARY KEY,
+            medecin_id VARCHAR(255) NOT NULL,
+            admin_id VARCHAR(255) NOT NULL,
+            action ENUM('validation', 'rejet', 'mise_en_attente') NOT NULL,
+            statut_avant VARCHAR(50) NOT NULL,
+            statut_apres VARCHAR(50) NOT NULL,
+            motif TEXT NULL,
+            date_action TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            commentaire_admin TEXT NULL,
+            adresse_ip VARCHAR(45) NULL,
+            FOREIGN KEY (medecin_id) REFERENCES medecins(id) ON DELETE CASCADE,
+            FOREIGN KEY (admin_id) REFERENCES utilisateurs(id) ON DELETE CASCADE,
+            INDEX idx_medecin_id (medecin_id),
+            INDEX idx_admin_id (admin_id),
+            INDEX idx_date_action (date_action)
+          )`
+        );
+        console.log("✅ Table 'historique_validations' créée");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erreur lors de la création de la table 'historique_validations': ${error.message}`);
+    }
+    
     connection.release();
     console.log("✅ Tables créées avec succès");
     
@@ -529,7 +700,12 @@ export async function createTablesIfNotExists(): Promise<void> {
  * Fonction pour fermer proprement les connexions
  */
 export async function closeDatabase(): Promise<void> {
-  await pool.end();
-  console.log("🔌 Connexions MySQL fermées");
+  if (isPostgres) {
+    await dbClient.end();
+    console.log("🔌 Connexions PostgreSQL fermées");
+  } else {
+    await dbClient.end();
+    console.log("🔌 Connexions MySQL fermées");
+  }
 }
 

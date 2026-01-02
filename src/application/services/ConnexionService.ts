@@ -71,6 +71,8 @@ export class ConnexionService {
 
       if (existingConnexion.length > 0) {
         const existing = existingConnexion[0];
+        console.log(`[SendConnexionRequest] Connexion existante trouvée - Statut: ${existing.statut}`);
+        
         if (existing.statut === "Accepté") {
           return {
             success: false,
@@ -82,10 +84,47 @@ export class ConnexionService {
           return {
             success: false,
             error: "Demande en attente",
-            message: "Une demande de connexion est déjà en attente",
+            message: "Une demande de connexion est déjà en attente pour ce médecin",
           };
         }
         // Si la connexion était révoquée, on peut créer une nouvelle demande
+        if (existing.statut === "Revoqué") {
+          console.log(`[SendConnexionRequest] Réactivation d'une connexion révoquée`);
+          
+          // Réactiver la connexion existante au lieu d'en créer une nouvelle
+          await db
+            .update(connexions)
+            .set({
+              statut: "En_attente",
+              dateCreation: new Date(),
+              dateAcceptation: null,
+              niveauAcces: null,
+            })
+            .where(eq(connexions.id, existing.id));
+
+          // Récupérer la connexion réactivée avec les informations du médecin
+          const reactivatedConnexion = await db
+            .select({
+              id: connexions.id,
+              idPatient: connexions.idPatient,
+              idMedecin: connexions.idMedecin,
+              statut: connexions.statut,
+              dateCreation: connexions.dateCreation,
+              dateAcceptation: connexions.dateAcceptation,
+              medecinNom: medecins.nom,
+              medecinSpecialite: medecins.specialite,
+            })
+            .from(connexions)
+            .innerJoin(medecins, eq(connexions.idMedecin, medecins.id))
+            .where(eq(connexions.id, existing.id))
+            .limit(1);
+
+          return {
+            success: true,
+            data: reactivatedConnexion[0],
+            message: "Demande de connexion réactivée avec succès",
+          };
+        }
       }
 
       // Créer la nouvelle demande de connexion
@@ -135,7 +174,8 @@ export class ConnexionService {
    */
   static async acceptConnexion(
     connexionId: string,
-    medecinId: string
+    medecinId: string,
+    niveauAcces: "Complet" | "Partiel" | "Lecture_Seule" = "Complet"
   ): Promise<ConnexionResponse> {
     try {
       // Vérifier que la connexion existe et appartient au médecin
@@ -186,20 +226,38 @@ export class ConnexionService {
         };
       }
 
-      // Accepter la connexion
+      // Accepter la connexion avec niveau d'accès
       await db
         .update(connexions)
         .set({
           statut: "Accepté",
           dateAcceptation: new Date(),
+          niveauAcces: niveauAcces,
         })
         .where(eq(connexions.id, connexionId));
 
       console.log(`[AcceptConnexion] Connexion ${connexionId} acceptée avec succès`);
 
+      // Récupérer les détails pour la réponse
+      const connexionDetails = await db
+        .select({
+          id: connexions.id,
+          statut: connexions.statut,
+          niveauAcces: connexions.niveauAcces,
+          dateAcceptation: connexions.dateAcceptation,
+          patientNom: patients.nom,
+          medecinNom: medecins.nom,
+        })
+        .from(connexions)
+        .innerJoin(patients, eq(connexions.idPatient, patients.id))
+        .innerJoin(medecins, eq(connexions.idMedecin, medecins.id))
+        .where(eq(connexions.id, connexionId))
+        .limit(1);
+
       return {
         success: true,
-        message: "Demande de connexion acceptée",
+        data: connexionDetails[0],
+        message: `Demande de connexion acceptée avec niveau d'accès: ${niveauAcces}`,
       };
     } catch (error: any) {
       console.error("Erreur lors de l'acceptation de la connexion:", error);
@@ -217,7 +275,8 @@ export class ConnexionService {
   static async rejectConnexion(
     connexionId: string,
     userId: string,
-    userType: string
+    userType: string,
+    motif?: string
   ): Promise<ConnexionResponse> {
     try {
       // Vérifier que la connexion existe
@@ -235,10 +294,13 @@ export class ConnexionService {
         };
       }
 
+      const currentConnexion = connexion[0];
+      console.log(`[RejectConnexion] Connexion ${connexionId} - Statut actuel: ${currentConnexion.statut}`);
+
       // Vérifier que l'utilisateur a le droit de révoquer
       const canReject =
-        (userType === "patient" && connexion[0].idPatient === userId) ||
-        (userType === "medecin" && connexion[0].idMedecin === userId);
+        (userType === "patient" && currentConnexion.idPatient === userId) ||
+        (userType === "medecin" && currentConnexion.idMedecin === userId);
 
       if (!canReject) {
         return {
@@ -246,6 +308,12 @@ export class ConnexionService {
           error: "Accès refusé",
           message: "Vous n'avez pas le droit de révoquer cette connexion",
         };
+      }
+
+      // Déterminer le message selon le statut actuel
+      let actionMessage = "révoquée";
+      if (currentConnexion.statut === "En_attente") {
+        actionMessage = userType === "medecin" ? "refusée" : "annulée";
       }
 
       // Révoquer la connexion
@@ -256,9 +324,26 @@ export class ConnexionService {
         })
         .where(eq(connexions.id, connexionId));
 
+      console.log(`[RejectConnexion] Connexion ${connexionId} ${actionMessage} avec succès`);
+
+      // Récupérer les détails pour la réponse
+      const connexionDetails = await db
+        .select({
+          id: connexions.id,
+          statut: connexions.statut,
+          patientNom: patients.nom,
+          medecinNom: medecins.nom,
+        })
+        .from(connexions)
+        .innerJoin(patients, eq(connexions.idPatient, patients.id))
+        .innerJoin(medecins, eq(connexions.idMedecin, medecins.id))
+        .where(eq(connexions.id, connexionId))
+        .limit(1);
+
       return {
         success: true,
-        message: "Connexion révoquée",
+        data: connexionDetails[0],
+        message: `Connexion ${actionMessage}${motif ? ` - Motif: ${motif}` : ""}`,
       };
     } catch (error: any) {
       console.error("Erreur lors de la révocation de la connexion:", error);

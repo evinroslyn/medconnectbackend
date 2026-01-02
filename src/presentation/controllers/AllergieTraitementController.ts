@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { AllergieTraitementService } from "../../application/services/AllergieTraitementService";
-import { authenticateToken } from "../../infrastructure/auth/middleware";
+
 
 /**
  * Contrôleur pour gérer les allergies et traitements des patients

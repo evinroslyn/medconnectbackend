@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, timestamp } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, timestamp } from "drizzle-orm/mysql-core";
 import { dossiersMedicaux } from "./dossiersMedicaux";
 import { medecins } from "./medecins";
 import { relations } from "drizzle-orm";

@@ -103,7 +103,7 @@ export class DossierMedical {
    * Téléverse un fichier associé au dossier
    * @param fichier - Fichier à téléverser
    */
-  televerserFichier(fichier: File): void {
+  televerserFichier(_fichier: File): void {
     // Cette méthode sera implémentée dans la couche service
   }
 

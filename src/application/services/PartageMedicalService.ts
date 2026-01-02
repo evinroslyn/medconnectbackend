@@ -2,7 +2,7 @@ import { db } from "../../infrastructure/database/db";
 import { partagesMedicaux } from "../../infrastructure/database/schema/partagesMedicaux";
 import { medecins } from "../../infrastructure/database/schema/medecins";
 import { utilisateurs } from "../../infrastructure/database/schema/utilisateurs";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 export interface CreatePartageData {
@@ -67,7 +67,7 @@ export class PartageMedicalService {
 
       if (existingPartage.length > 0) {
         // Mettre à jour le partage existant
-        const updated = await db
+        await db
           .update(partagesMedicaux)
           .set({
             peutTelecharger: data.peutTelecharger,
@@ -145,7 +145,7 @@ export class PartageMedicalService {
           )
         );
 
-      const partagesWithMedecin = partages.map((p) => ({
+      const partagesWithMedecin = partages.map((p: any) => ({
         ...this.mapToPartageMedical(p.partage),
         medecin: p.medecin,
       }));
@@ -181,7 +181,7 @@ export class PartageMedicalService {
 
       return {
         success: true,
-        data: partages.map((p) => this.mapToPartageMedical(p)),
+        data: partages.map((p: any) => this.mapToPartageMedical(p)),
       };
     } catch (error: any) {
       console.error("Erreur lors de la récupération des partages:", error);
@@ -232,8 +232,8 @@ export class PartageMedicalService {
 
       return {
         hasAccess: true,
-        peutTelecharger: p.peutTelecharger === 1 || p.peutTelecharger === true,
-        peutScreenshot: p.peutScreenshot === 1 || p.peutScreenshot === true,
+        peutTelecharger: Boolean(p.peutTelecharger),
+        peutScreenshot: Boolean(p.peutScreenshot),
       };
     } catch (error: any) {
       console.error("Erreur lors de la vérification d'accès:", error);
@@ -295,8 +295,8 @@ export class PartageMedicalService {
       idMedecin: partage.idMedecin,
       typeRessource: partage.typeRessource,
       idRessource: partage.idRessource,
-      peutTelecharger: partage.peutTelecharger === 1 || partage.peutTelecharger === true,
-      peutScreenshot: partage.peutScreenshot === 1 || partage.peutScreenshot === true,
+      peutTelecharger: Boolean(partage.peutTelecharger),
+      peutScreenshot: Boolean(partage.peutScreenshot),
       dateCreation: partage.dateCreation,
       dateExpiration: partage.dateExpiration || undefined,
       statut: partage.statut,

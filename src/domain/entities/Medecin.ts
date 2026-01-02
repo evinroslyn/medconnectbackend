@@ -92,7 +92,7 @@ export class Medecin extends Utilisateur {
    * @param motDePasse - Mot de passe en clair
    * @returns true si l'authentification réussit
    */
-  async authentifier(mail: string, motDePasse: string): Promise<boolean> {
+  async authentifier(mail: string, _motDePasse: string): Promise<boolean> {
     // Cette méthode sera implémentée dans la couche service
     return this.mail === mail;
   }
@@ -113,8 +113,8 @@ export class Medecin extends Utilisateur {
    * @returns Liste des dossiers médicaux correspondants
    */
   rechercherDossiersPatient(
-    idPatient: string,
-    filtres: FiltresDossier
+    _idPatient: string,
+    _filtres: FiltresDossier
   ): DossierMedical[] {
     // Cette méthode sera implémentée dans la couche service
     return [];
@@ -124,7 +124,7 @@ export class Medecin extends Utilisateur {
    * Visualise le profil complet d'un patient
    * @param idPatient - Identifiant du patient
    */
-  visualiserProfilPatient(idPatient: string): void {
+  visualiserProfilPatient(_idPatient: string): void {
     // Cette méthode sera implémentée dans la couche service
   }
 
@@ -136,9 +136,9 @@ export class Medecin extends Utilisateur {
    * @returns Liste des dossiers filtrés
    */
   filtrerDossier(
-    type: TypeEnregistrement,
-    dateDebut: Date,
-    dateFin: Date
+    _type: TypeEnregistrement,
+    _dateDebut: Date,
+    _dateFin: Date
   ): DossierMedical[] {
     // Cette méthode sera implémentée dans la couche service
     return [];
@@ -149,7 +149,7 @@ export class Medecin extends Utilisateur {
    * @param idDossier - Identifiant du dossier
    * @param diagnostic - Diagnostic à ajouter
    */
-  ajouterDiagnosticDossier(idDossier: string, diagnostic: string): void {
+  ajouterDiagnosticDossier(_idDossier: string, _diagnostic: string): void {
     // Cette méthode sera implémentée dans la couche service
   }
 
@@ -161,9 +161,9 @@ export class Medecin extends Utilisateur {
    * @returns Ordonnance créée
    */
   prescriptionMedicament(
-    idPatient: string,
-    medicament: string,
-    dosage: string
+    _idPatient: string,
+    _medicament: string,
+    _dosage: string
   ): Ordonnance {
     // Cette méthode sera implémentée dans la couche service
     return {} as Ordonnance;
@@ -175,7 +175,7 @@ export class Medecin extends Utilisateur {
    * @param date - Date et heure de la téléconsultation
    * @returns Rendez-vous créé
    */
-  planifierTeleconsulation(idPatient: string, date: Date): RendezVous {
+  planifierTeleconsulation(_idPatient: string, _date: Date): RendezVous {
     // Cette méthode sera implémentée dans la couche service
     return {} as RendezVous;
   }
@@ -186,7 +186,7 @@ export class Medecin extends Utilisateur {
    * @param contenu - Contenu du message
    * @returns Message créé
    */
-  envoyerMessage(destinataire: string, contenu: string): Message {
+  envoyerMessage(_destinataire: string, _contenu: string): Message {
     // Cette méthode sera implémentée dans la couche service
     return {} as Message;
   }

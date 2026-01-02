@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: meed-connect-backend
+    env: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        value: "https://healio-sand.vercel.app,https://med-connect.vercel.app,https://med-connect-git-main.vercel.app"
+    healthCheckPath: /health
+

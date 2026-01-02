@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { PatientService } from "../../application/services/PatientService";
-import { authenticateToken } from "../../infrastructure/auth/middleware";
-import { requireUserType } from "../../infrastructure/auth/middleware";
+
 
 /**
  * Contrôleur de gestion des patients

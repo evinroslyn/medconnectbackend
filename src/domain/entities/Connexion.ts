@@ -102,7 +102,7 @@ export class Connexion {
    * @param ressource - Ressource à vérifier
    * @returns true si l'accès est autorisé
    */
-  verifierAcces(ressource: string): boolean {
+  verifierAcces(_ressource: string): boolean {
     // Cette méthode sera implémentée dans la couche service
     // La logique de vérification d'accès sera gérée selon le niveau d'accès
     if (this.statut !== Status.ACCEPTE) {

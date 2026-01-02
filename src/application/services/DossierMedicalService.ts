@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../../infrastructure/database/db";
 import { dossiersMedicaux } from "../../infrastructure/database/schema";
 import { randomUUID } from "crypto";
-import { FileStorageService } from "../../infrastructure/storage/fileStorage";
+
 import type { TypeEnregistrement } from "../../domain/enums/TypeEnregistrement";
 
 /**
@@ -33,7 +33,7 @@ export class DossierMedicalService {
 
       return {
         success: true,
-        data: dossiers.map((d) => ({
+        data: dossiers.map((d: any) => ({
           id: d.id,
           idPatient: d.idPatient,
           titre: d.titre,

@@ -8,7 +8,7 @@ dotenv.config();
  * @param telephone - Numéro de téléphone de l'utilisateur
  * @returns Clé secrète 2FA
  */
-export function generate2FASecret(telephone: string): string {
+export function generate2FASecret(_telephone: string): string {
   return authenticator.generateSecret();
 }
 

@@ -18,6 +18,7 @@ import messageRoutes from "./presentation/routes/message.routes";
 import medecinRoutes from "./presentation/routes/medecin.routes";
 import patientRoutes from "./presentation/routes/patient.routes";
 import rendezVousRoutes from "./presentation/routes/rendez-vous.routes";
+import { userStatusRoutes } from "./presentation/routes/user-status.routes";
 import commentaireRoutes from "./presentation/routes/commentaire.routes";
 import allergieTraitementRoutes from "./presentation/routes/allergie-traitement.routes";
 
@@ -30,12 +31,13 @@ const app: Application = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 // Configuration CORS
+// En production, utiliser CORS_ORIGIN depuis les variables d'environnement
 // En développement, autoriser toutes les origines pour faciliter les tests
 const corsOptions = {
   origin: process.env.CORS_ORIGIN 
-    ? process.env.CORS_ORIGIN.split(",") 
+    ? process.env.CORS_ORIGIN.split(",").map(origin => origin.trim())
     : (process.env.NODE_ENV === "production" 
-      ? ["http://localhost:4200", "http://localhost:8081"] 
+      ? [] // En production sans CORS_ORIGIN, ne rien autoriser par défaut
       : true), // Autoriser toutes les origines en développement
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -97,11 +99,16 @@ app.use("/uploads", (req, res, next) => {
     return res.sendStatus(200);
   }
   
-  next();
+  return next();
 }, express.static(path.join(process.cwd(), "uploads")));
 
 // Route de santé pour vérifier que l'API fonctionne
+// Health check endpoint pour Render
 app.get("/health", (_req: Request, res: Response) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+app.get("/api/health", (_req: Request, res: Response) => {
   res.status(200).json({
     status: "OK",
     message: "Med-Connect API est opérationnelle",
@@ -115,7 +122,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/files", filesRoutes);
 app.use("/api/dossiers-medicaux", dossierMedicalRoutes);
 // #region agent log
-app.use("/api/documents-medicaux", (req, res, next) => {
+app.use("/api/documents-medicaux", (req, _res, next) => {
   fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.ts:115',message:'Route /api/documents-medicaux matched in main app',data:{path:req.path,url:req.url,method:req.method,originalUrl:req.originalUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
   next();
 }, documentMedicalRoutes);
@@ -126,6 +133,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/medecins", medecinRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/rendez-vous", rendezVousRoutes);
+app.use("/api/user-status", userStatusRoutes);
 app.use("/api/commentaires", commentaireRoutes);
 app.use("/api", allergieTraitementRoutes);
 
@@ -172,7 +180,8 @@ httpServer.listen(PORT, HOST, async () => {
     await testConnection();
     await createTablesIfNotExists();
   } catch (error) {
-    console.error("Impossible de se connecter à MySQL. Vérifiez votre configuration.");
+    console.error("Impossible de se connecter à la base de données. Vérifiez votre configuration.");
+    console.error(error);
   }
 });
 

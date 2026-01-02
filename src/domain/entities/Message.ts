@@ -88,7 +88,7 @@ export class Message {
    * @param cle - Clé de déchiffrement
    * @returns Contenu déchiffré
    */
-  dechiffrer(cle: string): string {
+  dechiffrer(_cle: string): string {
     // Cette méthode sera implémentée dans la couche service
     // Le déchiffrement sera géré par le service de messagerie
     return this.contenu;

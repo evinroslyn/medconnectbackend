@@ -98,7 +98,7 @@ export abstract class Utilisateur {
    * @param code - Code 2FA à vérifier
    * @returns true si le code est valide, false sinon
    */
-  verifier2FA(code: string): boolean {
+  verifier2FA(_code: string): boolean {
     // Cette méthode sera implémentée dans la couche service
     // La vérification du code 2FA sera gérée par le service d'authentification
     return false;

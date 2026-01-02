@@ -104,8 +104,8 @@ export async function decryptMessage(encryptedText: string): Promise<string> {
     decipher.setAuthTag(tag);
     
     // Déchiffrer le texte
-    let decrypted = decipher.update(encrypted, null, "utf8");
-    decrypted += decipher.final("utf8");
+    const decryptedBuffer = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    const decrypted = decryptedBuffer.toString("utf8");
     
     return decrypted;
   } catch (error) {

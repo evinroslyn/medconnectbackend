@@ -15,7 +15,7 @@ const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || "10485760"); // 10MB p
  * Configuration de Multer pour le stockage des fichiers
  */
 const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
+  destination: async (_req, _file, cb) => {
     const uploadPath = path.join(process.cwd(), uploadDir);
     
     // Créer le dossier s'il n'existe pas
@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
     
     cb(null, uploadPath);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     // Générer un nom de fichier unique
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const extension = path.extname(file.originalname);
@@ -38,7 +38,7 @@ const storage = multer.diskStorage({
 /**
  * Filtre pour les types de fichiers autorisés
  */
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   // Types de fichiers médicaux autorisés
   const allowedMimeTypes = [
     'application/pdf',
