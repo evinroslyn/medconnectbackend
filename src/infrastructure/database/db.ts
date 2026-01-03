@@ -22,6 +22,11 @@ const poolConfig: any = {
   family: process.env.DB_IP_FAMILY ? parseInt(process.env.DB_IP_FAMILY) : undefined,
 };
 
+// Ajouter SSL si demandé dans la chaîne de connexion (important pour le pooler)
+if (process.env.DATABASE_URL.includes("sslmode=require") || process.env.DATABASE_URL.includes("ssl=true")) {
+  poolConfig.ssl = { rejectUnauthorized: false };
+}
+
 const pool = new PgPool(poolConfig);
 const dbClient = pool;
 const db = drizzlePg(pool, { schema });

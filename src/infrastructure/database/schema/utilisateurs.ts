@@ -1,10 +1,12 @@
-import { mysqlTable, varchar, timestamp, text, mysqlEnum } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, timestamp, text, pgEnum } from "drizzle-orm/pg-core";
+
+export const userTypeEnum = pgEnum("user_type", ["patient", "medecin", "administrateur"]);
 
 /**
  * Table des utilisateurs (classe de base)
  * Stocke les informations communes à tous les types d'utilisateurs
  */
-export const utilisateurs = mysqlTable("utilisateurs", {
+export const utilisateurs = pgTable("utilisateurs", {
   id: varchar("id", { length: 255 }).primaryKey(),
   mail: varchar("mail", { length: 255 }).notNull().unique(),
   motDePasse: varchar("mot_de_passe", { length: 255 }).notNull(),
@@ -15,8 +17,9 @@ export const utilisateurs = mysqlTable("utilisateurs", {
   derniereConnexion: timestamp("derniere_connexion"),
   adresse: text("adresse"),
   telephone: varchar("telephone", { length: 20 }),
-  typeUtilisateur: mysqlEnum("type_utilisateur", ["patient", "medecin", "administrateur"]).notNull(),
+  typeUtilisateur: userTypeEnum("type_utilisateur").notNull(),
   codeResetPassword: varchar("code_reset_password", { length: 10 }),
   codeResetPasswordExpires: timestamp("code_reset_password_expires"),
 });
+
 

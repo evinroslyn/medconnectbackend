@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, timestamp } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, text, timestamp } from "drizzle-orm/pg-core";
 import { dossiersMedicaux } from "./dossiersMedicaux";
 import { patients } from "./patients";
 import { relations } from "drizzle-orm";
@@ -7,7 +7,7 @@ import { relations } from "drizzle-orm";
  * Table des allergies
  * Stocke les allergies des patients
  */
-export const allergies = mysqlTable("allergies", {
+export const allergies = pgTable("allergies", {
   id: varchar("id", { length: 255 }).primaryKey(),
   idDossierMedical: varchar("id_dossier_medical", { length: 255 }).references(
     () => dossiersMedicaux.id,
@@ -20,6 +20,7 @@ export const allergies = mysqlTable("allergies", {
   description: text("description"),
   dateDecouverte: timestamp("date_decouverte"),
 });
+
 
 /**
  * Relations pour la table allergies

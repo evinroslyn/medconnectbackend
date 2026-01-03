@@ -1,13 +1,15 @@
-import { mysqlTable, varchar, timestamp, text, mysqlEnum } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, timestamp, text, pgEnum } from "drizzle-orm/pg-core";
 import { utilisateurs } from "./utilisateurs";
 import { medecins } from "./medecins";
 import { relations } from "drizzle-orm";
+
+export const historiqueActionEnum = pgEnum("historique_action", ["validation", "rejet", "mise_en_attente"]);
 
 /**
  * Table de l'historique des validations
  * Stocke toutes les actions effectuées par les administrateurs sur les demandes
  */
-export const historiqueValidations = mysqlTable("historique_validations", {
+export const historiqueValidations = pgTable("historique_validations", {
   id: varchar("id", { length: 255 }).primaryKey(),
   medecinId: varchar("medecin_id", { length: 255 }).notNull().references(() => medecins.id, {
     onDelete: "cascade",
@@ -15,7 +17,7 @@ export const historiqueValidations = mysqlTable("historique_validations", {
   adminId: varchar("admin_id", { length: 255 }).notNull().references(() => utilisateurs.id, {
     onDelete: "cascade",
   }),
-  action: mysqlEnum("action", ["validation", "rejet", "mise_en_attente"]).notNull(),
+  action: historiqueActionEnum("action").notNull(),
   statutAvant: varchar("statut_avant", { length: 50 }).notNull(),
   statutApres: varchar("statut_apres", { length: 50 }).notNull(),
   motif: text("motif"), // Motif du rejet ou commentaire
@@ -23,6 +25,7 @@ export const historiqueValidations = mysqlTable("historique_validations", {
   commentaireAdmin: text("commentaire_admin"), // Commentaire interne de l'admin
   adresseIP: varchar("adresse_ip", { length: 45 }), // Pour la traçabilité
 });
+
 
 /**
  * Relations pour la table historiqueValidations

@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, timestamp, boolean } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, text, timestamp, boolean } from "drizzle-orm/pg-core";
 import { utilisateurs } from "./utilisateurs";
 import { relations } from "drizzle-orm";
 
@@ -6,7 +6,7 @@ import { relations } from "drizzle-orm";
  * Table des messages
  * Stocke les messages sécurisés entre utilisateurs
  */
-export const messages = mysqlTable("messages", {
+export const messages = pgTable("messages", {
   id: varchar("id", { length: 255 }).primaryKey(),
   idExpediteur: varchar("id_expediteur", { length: 255 })
     .notNull()
@@ -18,6 +18,7 @@ export const messages = mysqlTable("messages", {
   dateEnvoi: timestamp("date_envoi").defaultNow().notNull(),
   confirmationDeLecture: boolean("lu").default(false).notNull(),
 });
+
 
 /**
  * Relations pour la table messages

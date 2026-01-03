@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, timestamp } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, text, timestamp } from "drizzle-orm/pg-core";
 import { dossiersMedicaux } from "./dossiersMedicaux";
 import { documentsMedicaux } from "./documentsMedicaux";
 import { medecins } from "./medecins";
@@ -9,7 +9,7 @@ import { relations } from "drizzle-orm";
  * Stocke les commentaires des médecins sur les dossiers médicaux ou les documents médicaux
  * Un commentaire peut être associé soit à un dossier médical, soit à un document médical spécifique
  */
-export const commentaires = mysqlTable("commentaires", {
+export const commentaires = pgTable("commentaires", {
   id: varchar("id", { length: 255 }).primaryKey(),
   idDossierMedical: varchar("id_dossier_medical", { length: 255 })
     .notNull()
@@ -22,6 +22,7 @@ export const commentaires = mysqlTable("commentaires", {
   contenu: text("contenu").notNull(),
   dateCreation: timestamp("date_creation").defaultNow().notNull(),
 });
+
 
 /**
  * Relations pour la table commentaires

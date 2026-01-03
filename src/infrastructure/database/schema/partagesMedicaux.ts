@@ -1,13 +1,15 @@
-import { mysqlTable, varchar, timestamp, mysqlEnum, boolean } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, timestamp, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { medecins } from "./medecins";
 import { patients } from "./patients";
 import { relations } from "drizzle-orm";
+
+export const partageTypeEnum = pgEnum("partage_type", ["dossier", "document"]);
 
 /**
  * Table des partages médicaux
  * Stocke les permissions de partage de dossiers ou documents médicaux avec des médecins
  */
-export const partagesMedicaux = mysqlTable("partages_medicaux", {
+export const partagesMedicaux = pgTable("partages_medicaux", {
   id: varchar("id", { length: 255 }).primaryKey(),
   idPatient: varchar("id_patient", { length: 255 })
     .notNull()
@@ -16,7 +18,7 @@ export const partagesMedicaux = mysqlTable("partages_medicaux", {
     .notNull()
     .references(() => medecins.id, { onDelete: "cascade" }),
   // Type de ressource partagée : 'dossier' ou 'document'
-  typeRessource: mysqlEnum("type_ressource", ["dossier", "document"]).notNull(),
+  typeRessource: partageTypeEnum("type_ressource").notNull(),
   // ID de la ressource partagée (dossier ou document)
   idRessource: varchar("id_ressource", { length: 255 }).notNull(),
   // Permissions : peut télécharger, peut faire des captures d'écran
@@ -26,8 +28,9 @@ export const partagesMedicaux = mysqlTable("partages_medicaux", {
   dateCreation: timestamp("date_creation").defaultNow().notNull(),
   dateExpiration: timestamp("date_expiration"), // Optionnel, null = pas d'expiration
   // Statut du partage
-  statut: mysqlEnum("statut", ["actif", "revoke", "expire"]).default("actif").notNull(),
+  statut: varchar("statut", { length: 50 }).default("actif").notNull(),
 });
+
 
 /**
  * Relations pour la table partagesMedicaux

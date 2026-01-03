@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, timestamp, text } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, timestamp, text } from "drizzle-orm/pg-core";
 import { utilisateurs } from "./utilisateurs";
 import { relations } from "drizzle-orm";
 
@@ -6,7 +6,7 @@ import { relations } from "drizzle-orm";
  * Table des médecins
  * Étend les informations de l'utilisateur avec des données spécifiques aux médecins
  */
-export const medecins = mysqlTable("medecins", {
+export const medecins = pgTable("medecins", {
   id: varchar("id", { length: 255 }).primaryKey().references(() => utilisateurs.id, {
     onDelete: "cascade",
   }),
@@ -29,6 +29,7 @@ export const medecins = mysqlTable("medecins", {
   adminValidateurId: varchar("admin_validateur_id", { length: 255 }).references(() => utilisateurs.id), // ID de l'admin qui a traité la demande
   historiqueActions: text("historique_actions"), // JSON des actions effectuées
 });
+
 
 /**
  * Relations pour la table medecins

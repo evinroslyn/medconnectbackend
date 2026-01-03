@@ -1,16 +1,16 @@
-import { mysqlTable, varchar, timestamp, int, text, mysqlEnum } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, timestamp, integer, text, pgEnum } from "drizzle-orm/pg-core";
 import { patients } from "./patients";
 import { medecins } from "./medecins";
 import { relations } from "drizzle-orm";
 
-/**
- * Énumération pour le statut de rendez-vous
- */
+export const rvTypeEnum = pgEnum("rv_type", ["Téléconsultation", "Présentiel"]);
+export const rvStatutEnum = pgEnum("rv_statut", ["Planifié", "Terminé", "Annulé"]);
+
 /**
  * Table des rendez-vous
  * Gère les rendez-vous et téléconsultations
  */
-export const rendezVous = mysqlTable("rendez_vous", {
+export const rendezVous = pgTable("rendez_vous", {
   id: varchar("id", { length: 255 }).primaryKey(),
   idPatient: varchar("id_patient", { length: 255 })
     .notNull()
@@ -19,11 +19,12 @@ export const rendezVous = mysqlTable("rendez_vous", {
     .notNull()
     .references(() => medecins.id, { onDelete: "cascade" }),
   date: timestamp("date").notNull(),
-  type: mysqlEnum("type", ["Téléconsultation", "Présentiel"]).notNull(),
-  statut: mysqlEnum("statut", ["Planifié", "Terminé", "Annulé"]).default("Planifié").notNull(),
+  type: rvTypeEnum("type").notNull(),
+  statut: rvStatutEnum("statut").default("Planifié").notNull(),
   notes: text("notes"),
-  duree: int("duree"), // Durée en minutes
+  duree: integer("duree"), // Durée en minutes
 });
+
 
 /**
  * Relations pour la table rendezVous

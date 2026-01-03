@@ -1,12 +1,22 @@
-import { mysqlTable, varchar, text, int, timestamp, mysqlEnum } from "drizzle-orm/mysql-core";
+import { pgTable, varchar, text, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { patients } from "./patients";
 import { relations } from "drizzle-orm";
+
+export const dossierTypeEnum = pgEnum("dossier_type", [
+  "Resultat_Labo",
+  "Radio",
+  "Ordonnance",
+  "Notes",
+  "Diagnostic",
+  "Imagerie",
+  "examen"
+]);
 
 /**
  * Table des dossiers médicaux
  * Stocke les informations sur les dossiers médicaux des patients
  */
-export const dossiersMedicaux = mysqlTable("dossiers_medicaux", {
+export const dossiersMedicaux = pgTable("dossiers_medicaux", {
   id: varchar("id", { length: 255 }).primaryKey(),
   idPatient: varchar("id_patient", { length: 255 })
     .notNull()
@@ -15,19 +25,12 @@ export const dossiersMedicaux = mysqlTable("dossiers_medicaux", {
   date: timestamp("date").notNull(),
   description: text("description"),
   // Le type est maintenant optionnel car un dossier peut contenir différents types de documents
-  type: mysqlEnum("type", [
-    "Resultat_Labo",
-    "Radio", 
-    "Ordonnance",
-    "Notes",
-    "Diagnostic",
-    "Imagerie",
-    "examen"
-  ]),
+  type: dossierTypeEnum("type"),
   // cheminFichier supprimé - les fichiers sont dans DocumentMedical
-  version: int("version").default(1).notNull(),
+  version: integer("version").default(1).notNull(),
   dernierModification: timestamp("dernier_modification").defaultNow().notNull(),
 });
+
 
 /**
  * Relations pour la table dossiersMedicaux
