@@ -1,5 +1,34 @@
 import * as dotenv from "dotenv";
 import * as schema from "./schema";
+import pkg from "pg";
+
+const { Pool } = pkg;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+
+  // 🔐 SSL obligatoire pour Supabase
+  ssl: {
+    rejectUnauthorized: false
+  },
+
+  // 🌐 FORCER IPv4 (corrige ENETUNREACH / IPv6)
+  family: 4
+});
+
+// 🔎 Test de connexion (au démarrage)
+export async function testConnection1(): Promise<void> {
+  try {
+    await pool.query("SELECT 1");
+    console.log("✅ Connexion à Supabase (IPv4) réussie");
+  } catch (error) {
+    console.error("❌ Impossible de se connecter à la base de données.");
+    console.error(error);
+    throw error;
+  }
+}
+
+export default pool;
 
 // MySQL
 import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";

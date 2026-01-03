@@ -3,7 +3,7 @@ import { createServer, Server as HttpServer } from "http";
 import cors from "cors";
 import path from "path";
 import * as dotenv from "dotenv";
-import { closeDatabase, testConnection, createTablesIfNotExists } from "./infrastructure/database/db";
+import { closeDatabase, testConnection, createTablesIfNotExists, testConnection1 } from "./infrastructure/database/db";
 import { WebSocketServerManager } from "./infrastructure/websocket/websocket.server";
 
 // Importation des routes
@@ -180,6 +180,7 @@ httpServer.listen(PORT, HOST, async () => {
   // Test de la connexion MySQL et création des tables
   try {
     await testConnection();
+    await testConnection1();
     await createTablesIfNotExists();
   } catch (error) {
     console.error("Impossible de se connecter à la base de données. Vérifiez votre configuration.");
