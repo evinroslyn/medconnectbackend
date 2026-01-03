@@ -2,34 +2,38 @@ import * as dotenv from "dotenv";
 import * as schema from "./schema";
 import pkg from "pg";
 
-const { Pool } = pkg;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-
-  // 🔐 SSL obligatoire pour Supabase
-  ssl: {
-    rejectUnauthorized: false
-  },
-
-  // 🌐 FORCER IPv4 (corrige ENETUNREACH / IPv6)
-  family: 4
-});
-
-// 🔎 Test de connexion (au démarrage)
 export async function testConnection1(): Promise<void> {
   try {
-    await pool.query("SELECT 1");
-    console.log("✅ Connexion à Supabase (IPv4) réussie");
+    if (isPostgres) {
+      // FIX: Cast en 'any' pour autoriser 'family: 4'
+      const config: any = {
+        connectionString: process.env.DATABASE_URL,
+        max: 10,
+        family: 4,
+      };
+
+      const tempPool = new PgPool(config);
+      const client = await tempPool.connect();
+      await client.query("SELECT 1");
+      client.release();
+      await tempPool.end();
+      console.log("✅ Connexion PostgreSQL (IPv4 forced) établie avec succès");
+    } else {
+      // Pour MySQL
+      const connection = await dbClient.getConnection();
+      try {
+        await connection.query("SELECT 1");
+      } finally {
+        connection.release();
+      }
+      console.log("✅ Connexion MySQL établie avec succès");
+    }
   } catch (error) {
-    console.error("❌ Impossible de se connecter à la base de données.");
-    console.error(error);
+    console.error("❌ Erreur de connexion (testConnection1):", error);
     throw error;
   }
 }
-
-export default pool;
-
 // MySQL
 import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
@@ -140,6 +144,11 @@ export async function testConnection(): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * Fonction pour créer automatiquement les tables si elles n'existent pas
+ */
+
 
 /**
  * Fonction pour créer automatiquement les tables si elles n'existent pas
