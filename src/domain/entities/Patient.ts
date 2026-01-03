@@ -6,6 +6,7 @@ import { Message } from "./Message";
 import { NiveauAcces } from "../enums/NiveauAcces";
 import { TypeEnregistrement } from "../enums/TypeEnregistrement";
 import { Genre } from "../enums/Genre";
+import { TypeUtilisateur } from "../enums/TypeUtilisateur";
 
 /**
  * Entité représentant un patient du système Med-Connect
@@ -28,6 +29,11 @@ export class Patient extends Utilisateur {
   genre: Genre;
 
   /**
+   * Chemin vers la photo de profil
+   */
+  photoProfil?: string;
+
+  /**
    * Dossiers médicaux possédés par le patient
    */
   dossiersMedicaux?: DossierMedical[];
@@ -46,9 +52,14 @@ export class Patient extends Utilisateur {
     genre: Genre,
     dateCreation: Date,
     secretDeuxFacteur?: string,
+    codeSMS?: string,
+    codeSMSExpiration?: Date,
     derniereConnexion?: Date,
     adresse?: string,
     telephone?: string,
+    photoProfil?: string,
+    codeResetPassword?: string,
+    codeResetPasswordExpires?: Date,
     dossiersMedicaux?: DossierMedical[],
     connexions?: Connexion[]
   ) {
@@ -57,14 +68,20 @@ export class Patient extends Utilisateur {
       mail,
       motDePasse,
       dateCreation,
+      TypeUtilisateur.PATIENT,
       secretDeuxFacteur,
+      codeSMS,
+      codeSMSExpiration,
       derniereConnexion,
       adresse,
-      telephone
+      telephone,
+      codeResetPassword,
+      codeResetPasswordExpires
     );
     this.nom = nom;
     this.dateNaissance = dateNaissance;
     this.genre = genre;
+    this.photoProfil = photoProfil;
     this.dossiersMedicaux = dossiersMedicaux;
     this.connexions = connexions;
   }

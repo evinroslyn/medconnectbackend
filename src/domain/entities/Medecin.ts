@@ -7,6 +7,7 @@ import { Commentaire } from "./Commentaire";
 import { Message } from "./Message";
 import { Ordonnance } from "./Ordonnance";
 import { TypeEnregistrement } from "../enums/TypeEnregistrement";
+import { TypeUtilisateur } from "../enums/TypeUtilisateur";
 
 /**
  * Interface pour les filtres de recherche de dossiers
@@ -38,6 +39,66 @@ export class Medecin extends Utilisateur {
   numeroLicence: string;
 
   /**
+   * Statut de vérification (en_attente, valide, rejete)
+   */
+  statutVerification: string;
+
+  /**
+   * Chemin vers le document CNI/Passeport
+   */
+  documentIdentite?: string;
+
+  /**
+   * Chemin vers le diplôme
+   */
+  diplome?: string;
+
+  /**
+   * Chemin vers la photo de profil
+   */
+  photoProfil?: string;
+
+  /**
+   * Nombre d'années d'expérience
+   */
+  anneesExperience?: string;
+
+  /**
+   * Description personnelle du médecin
+   */
+  description?: string;
+
+  /**
+   * Éducation et formations du médecin
+   */
+  education?: string;
+
+  /**
+   * Spécialisations médicales
+   */
+  specialisations?: string;
+
+  /**
+   * Date de validation ou de rejet de la demande
+   */
+  dateValidation?: Date;
+
+  /**
+   * Motif du rejet (si applicable)
+   */
+  motifRejet?: string;
+
+  /**
+   * ID de l'administrateur qui a validé le compte
+   */
+  adminValidateurId?: string;
+
+  /**
+   * Historique des actions au format JSON (string)
+   */
+  historiqueActions?: string;
+
+  /**
    * Connexions avec les patients
    */
   connexions?: Connexion[];
@@ -60,10 +121,26 @@ export class Medecin extends Utilisateur {
     specialite: string,
     numeroLicence: string,
     dateCreation: Date,
+    statutVerification: string = "en_attente",
     secretDeuxFacteur?: string,
+    codeSMS?: string,
+    codeSMSExpiration?: Date,
     derniereConnexion?: Date,
     adresse?: string,
     telephone?: string,
+    documentIdentite?: string,
+    diplome?: string,
+    photoProfil?: string,
+    anneesExperience?: string,
+    description?: string,
+    education?: string,
+    specialisations?: string,
+    dateValidation?: Date,
+    motifRejet?: string,
+    adminValidateurId?: string,
+    historiqueActions?: string,
+    codeResetPassword?: string,
+    codeResetPasswordExpires?: Date,
     connexions?: Connexion[],
     rendezVous?: RendezVous[],
     commentaires?: Commentaire[]
@@ -73,14 +150,31 @@ export class Medecin extends Utilisateur {
       mail,
       motDePasse,
       dateCreation,
+      TypeUtilisateur.MEDECIN,
       secretDeuxFacteur,
+      codeSMS,
+      codeSMSExpiration,
       derniereConnexion,
       adresse,
-      telephone
+      telephone,
+      codeResetPassword,
+      codeResetPasswordExpires
     );
     this.nom = nom;
     this.specialite = specialite;
     this.numeroLicence = numeroLicence;
+    this.statutVerification = statutVerification;
+    this.documentIdentite = documentIdentite;
+    this.diplome = diplome;
+    this.photoProfil = photoProfil;
+    this.anneesExperience = anneesExperience;
+    this.description = description;
+    this.education = education;
+    this.specialisations = specialisations;
+    this.dateValidation = dateValidation;
+    this.motifRejet = motifRejet;
+    this.adminValidateurId = adminValidateurId;
+    this.historiqueActions = historiqueActions;
     this.connexions = connexions;
     this.rendezVous = rendezVous;
     this.commentaires = commentaires;

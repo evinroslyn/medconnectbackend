@@ -1,4 +1,5 @@
 import { Message } from "./Message";
+import { TypeUtilisateur } from "../enums/TypeUtilisateur";
 
 /**
  * Classe abstraite représentant un utilisateur du système Med-Connect
@@ -27,6 +28,16 @@ export abstract class Utilisateur {
   secretDeuxFacteur?: string;
 
   /**
+   * Code de vérification envoyé par SMS ou Email
+   */
+  codeSMS?: string;
+
+  /**
+   * Date d'expiration du code de vérification
+   */
+  codeSMSExpiration?: Date;
+
+  /**
    * Date de création du compte utilisateur
    */
   dateCreation: Date;
@@ -47,6 +58,21 @@ export abstract class Utilisateur {
   telephone?: string;
 
   /**
+   * Type d'utilisateur (Patient, Médecin, Administrateur)
+   */
+  typeUtilisateur: TypeUtilisateur;
+
+  /**
+   * Code de réinitialisation du mot de passe
+   */
+  codeResetPassword?: string;
+
+  /**
+   * Date d'expiration du code de réinitialisation
+   */
+  codeResetPasswordExpires?: Date;
+
+  /**
    * Messages envoyés par l'utilisateur
    */
   messagesEnvoyes?: Message[];
@@ -61,19 +87,29 @@ export abstract class Utilisateur {
     mail: string,
     motDePasse: string,
     dateCreation: Date,
+    typeUtilisateur: TypeUtilisateur,
     secretDeuxFacteur?: string,
+    codeSMS?: string,
+    codeSMSExpiration?: Date,
     derniereConnexion?: Date,
     adresse?: string,
-    telephone?: string
+    telephone?: string,
+    codeResetPassword?: string,
+    codeResetPasswordExpires?: Date
   ) {
     this.id = id;
     this.mail = mail;
     this.motDePasse = motDePasse;
     this.dateCreation = dateCreation;
+    this.typeUtilisateur = typeUtilisateur;
     this.secretDeuxFacteur = secretDeuxFacteur;
+    this.codeSMS = codeSMS;
+    this.codeSMSExpiration = codeSMSExpiration;
     this.derniereConnexion = derniereConnexion;
     this.adresse = adresse;
     this.telephone = telephone;
+    this.codeResetPassword = codeResetPassword;
+    this.codeResetPasswordExpires = codeResetPasswordExpires;
   }
 
   /**

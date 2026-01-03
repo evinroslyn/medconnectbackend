@@ -1,4 +1,5 @@
 import { Utilisateur } from "./Utilisateur";
+import { TypeUtilisateur } from "../enums/TypeUtilisateur";
 
 /**
  * Entité représentant un administrateur du système Med-Connect
@@ -17,19 +18,28 @@ export class Administrateur extends Utilisateur {
     nom: string,
     dateCreation: Date,
     secretDeuxFacteur?: string,
+    codeSMS?: string,
+    codeSMSExpiration?: Date,
     derniereConnexion?: Date,
     adresse?: string,
-    telephone?: string
+    telephone?: string,
+    codeResetPassword?: string,
+    codeResetPasswordExpires?: Date
   ) {
     super(
       id,
       mail,
       motDePasse,
       dateCreation,
+      TypeUtilisateur.ADMINISTRATEUR,
       secretDeuxFacteur,
+      codeSMS,
+      codeSMSExpiration,
       derniereConnexion,
       adresse,
-      telephone
+      telephone,
+      codeResetPassword,
+      codeResetPasswordExpires
     );
     this.nom = nom;
   }
