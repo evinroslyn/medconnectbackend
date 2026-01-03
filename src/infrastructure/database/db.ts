@@ -1,39 +1,8 @@
 import * as dotenv from "dotenv";
 import * as schema from "./schema";
-import pkg from "pg";
+import fs from "fs";
+import path from "path";
 
-
-export async function testConnection1(): Promise<void> {
-  try {
-    if (isPostgres) {
-      // FIX: Cast en 'any' pour autoriser 'family: 4'
-      const config: any = {
-        connectionString: process.env.DATABASE_URL,
-        max: 10,
-        family: 4,
-      };
-
-      const tempPool = new PgPool(config);
-      const client = await tempPool.connect();
-      await client.query("SELECT 1");
-      client.release();
-      await tempPool.end();
-      console.log("✅ Connexion PostgreSQL (IPv4 forced) établie avec succès");
-    } else {
-      // Pour MySQL
-      const connection = await dbClient.getConnection();
-      try {
-        await connection.query("SELECT 1");
-      } finally {
-        connection.release();
-      }
-      console.log("✅ Connexion MySQL établie avec succès");
-    }
-  } catch (error) {
-    console.error("❌ Erreur de connexion (testConnection1):", error);
-    throw error;
-  }
-}
 // MySQL
 import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
@@ -41,9 +10,6 @@ import mysql from "mysql2/promise";
 // Postgres
 import { Pool as PgPool } from "pg";
 import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
-
-import fs from "fs";
-import path from "path";
 
 dotenv.config();
 
@@ -93,10 +59,16 @@ let db: any;
 let dbClient: any;
 
 if (isPostgres) {
-  const pool = new PgPool({ connectionString: process.env.DATABASE_URL, max: 10 });
+  // Cast to 'any' to allow 'family' property which forces IPv4
+  const poolConfig: any = {
+    connectionString: process.env.DATABASE_URL,
+    max: 10,
+    family: 4, // Force IPv4 to avoid IPv6 connection issues
+  };
+  const pool = new PgPool(poolConfig);
   dbClient = pool;
   db = drizzlePg(pool, { schema });
-  console.log("🔌 Utilisation de PostgreSQL pour la base de données");
+  console.log("🔌 Utilisation de PostgreSQL pour la base de données (IPv4)");
 } else {
   const connectionConfig = {
     host: parsed.host,
@@ -146,9 +118,39 @@ export async function testConnection(): Promise<void> {
 }
 
 /**
- * Fonction pour créer automatiquement les tables si elles n'existent pas
+ * Fonction pour tester la connexion à la base de données (IPv4 forced)
  */
+export async function testConnection1(): Promise<void> {
+  try {
+    if (isPostgres) {
+      // FIX: Cast en 'any' pour autoriser 'family: 4'
+      const config: any = {
+        connectionString: process.env.DATABASE_URL,
+        max: 10,
+        family: 4,
+      };
 
+      const tempPool = new PgPool(config);
+      const client = await tempPool.connect();
+      await client.query("SELECT 1");
+      client.release();
+      await tempPool.end();
+      console.log("✅ Connexion PostgreSQL (IPv4 forced) établie avec succès");
+    } else {
+      // Pour MySQL
+      const connection = await dbClient.getConnection();
+      try {
+        await connection.query("SELECT 1");
+      } finally {
+        connection.release();
+      }
+      console.log("✅ Connexion MySQL établie avec succès");
+    }
+  } catch (error) {
+    console.error("❌ Erreur de connexion (testConnection1):", error);
+    throw error;
+  }
+}
 
 /**
  * Fonction pour créer automatiquement les tables si elles n'existent pas
@@ -765,4 +767,3 @@ export async function closeDatabase(): Promise<void> {
     console.log("🔌 Connexions MySQL fermées");
   }
 }
-
