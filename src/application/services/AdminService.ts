@@ -669,12 +669,12 @@ export class AdminService {
         .where(eq(medecins.statutVerification, "rejete"));
 
       // Compter tous les utilisateurs par type
-      const patients = await db
+      const patientsCount = await db
         .select({ id: utilisateurs.id })
         .from(utilisateurs)
         .where(eq(utilisateurs.typeUtilisateur, "patient"));
 
-      const administrateurs = await db
+      const administrateursCount = await db
         .select({ id: utilisateurs.id })
         .from(utilisateurs)
         .where(eq(utilisateurs.typeUtilisateur, "administrateur"));
@@ -687,10 +687,10 @@ export class AdminService {
           total: medecinsEnAttente.length + medecinsValides.length + medecinsRejetes.length
         },
         patients: {
-          total: patients.length
+          total: patientsCount.length
         },
         administrateurs: {
-          total: administrateurs.length
+          total: administrateursCount.length
         }
       };
 
@@ -806,6 +806,104 @@ export class AdminService {
       return {
         success: false,
         message: "Erreur lors de la récupération des utilisateurs"
+      };
+    }
+  }
+
+  /**
+   * Récupérer un utilisateur par son ID avec ses données spécifiques
+   */
+  static async getUserById(userId: string): Promise<AdminResponse> {
+    try {
+      const user = await db
+        .select()
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, userId))
+        .limit(1);
+
+      if (user.length === 0) {
+        return {
+          success: false,
+          message: "Utilisateur non trouvé"
+        };
+      }
+
+      const userData = user[0];
+      let specificData = null;
+
+      // Récupérer les données spécifiques selon le type
+      if (userData.typeUtilisateur === "medecin") {
+        const medecin = await db
+          .select()
+          .from(medecins)
+          .where(eq(medecins.id, userId))
+          .limit(1);
+        specificData = medecin[0] || null;
+      } else if (userData.typeUtilisateur === "patient") {
+        const patient = await db
+          .select()
+          .from(patients)
+          .where(eq(patients.id, userId))
+          .limit(1);
+        specificData = patient[0] || null;
+      } else if (userData.typeUtilisateur === "administrateur") {
+        const admin = await db
+          .select()
+          .from(administrateurs)
+          .where(eq(administrateurs.id, userId))
+          .limit(1);
+        specificData = admin[0] || null;
+      }
+
+      return {
+        success: true,
+        message: "Utilisateur récupéré avec succès",
+        data: {
+          ...userData,
+          details: specificData
+        }
+      };
+    } catch (error) {
+      console.error("Erreur lors de la récupération de l'utilisateur:", error);
+      return {
+        success: false,
+        message: "Erreur lors de la récupération de l'utilisateur"
+      };
+    }
+  }
+
+  /**
+   * Supprimer un utilisateur (la suppression en cascade gérera les tables liées)
+   */
+  static async deleteUser(userId: string): Promise<AdminResponse> {
+    try {
+      // Vérifier si l'utilisateur existe
+      const user = await db
+        .select()
+        .from(utilisateurs)
+        .where(eq(utilisateurs.id, userId))
+        .limit(1);
+
+      if (user.length === 0) {
+        return {
+          success: false,
+          message: "Utilisateur non trouvé"
+        };
+      }
+
+      // Supprimer l'utilisateur de la table de base
+      // Grâce à onDelete: "cascade", les entrées dans medecins/patients/etc seront supprimées
+      await db.delete(utilisateurs).where(eq(utilisateurs.id, userId));
+
+      return {
+        success: true,
+        message: "Utilisateur supprimé avec succès"
+      };
+    } catch (error) {
+      console.error("Erreur lors de la suppression de l'utilisateur:", error);
+      return {
+        success: false,
+        message: "Erreur lors de la suppression de l'utilisateur"
       };
     }
   }
