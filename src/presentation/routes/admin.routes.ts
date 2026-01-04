@@ -75,6 +75,20 @@ router.patch("/medecins/:medecinId/rejeter", rejeterMedecinValidators, AdminCont
 router.get("/medecins/:medecinId/historique", AdminController.getHistoriqueMedecin);
 
 /**
+ * @route GET /api/admin/utilisateurs/:userId
+ * @desc Récupérer les détails d'un utilisateur
+ * @access Admin
+ */
+router.get("/utilisateurs/:userId", AdminController.getUserById);
+
+/**
+ * @route DELETE /api/admin/utilisateurs/:userId
+ * @desc Supprimer un utilisateur
+ * @access Admin
+ */
+router.delete("/utilisateurs/:userId", AdminController.deleteUser);
+
+/**
  * @route GET /api/admin/medecins/rechercher
  * @desc Rechercher des médecins avec filtres
  * @access Admin

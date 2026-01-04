@@ -182,12 +182,12 @@ export class AdminController {
    */
   static async rechercherMedecins(req: Request, res: Response): Promise<void> {
     try {
-      const { 
-        statut, 
-        nom, 
-        specialite, 
-        numeroLicence, 
-        dateDebut, 
+      const {
+        statut,
+        nom,
+        specialite,
+        numeroLicence,
+        dateDebut,
         dateFin,
         page = 1,
         limit = 10
@@ -277,6 +277,72 @@ export class AdminController {
         success: false,
         error: "Erreur serveur",
         message: "Une erreur est survenue lors de la récupération des utilisateurs"
+      });
+    }
+  }
+
+  /**
+   * Récupérer les détails d'un utilisateur par son ID
+   */
+  static async getUserById(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId } = req.params;
+
+      if (!userId) {
+        res.status(400).json({
+          success: false,
+          error: "ID manquant",
+          message: "L'ID de l'utilisateur est requis"
+        });
+        return;
+      }
+
+      const result = await AdminService.getUserById(userId);
+
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(result.message === "Utilisateur non trouvé" ? 404 : 400).json(result);
+      }
+    } catch (error) {
+      console.error("Erreur dans getUserById:", error);
+      res.status(500).json({
+        success: false,
+        error: "Erreur serveur",
+        message: "Une erreur est survenue lors de la récupération de l'utilisateur"
+      });
+    }
+  }
+
+  /**
+   * Supprimer un utilisateur
+   */
+  static async deleteUser(req: Request, res: Response): Promise<void> {
+    try {
+      const { userId } = req.params;
+
+      if (!userId) {
+        res.status(400).json({
+          success: false,
+          error: "ID manquant",
+          message: "L'ID de l'utilisateur est requis"
+        });
+        return;
+      }
+
+      const result = await AdminService.deleteUser(userId);
+
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(result.message === "Utilisateur non trouvé" ? 404 : 400).json(result);
+      }
+    } catch (error) {
+      console.error("Erreur dans deleteUser:", error);
+      res.status(500).json({
+        success: false,
+        error: "Erreur serveur",
+        message: "Une erreur est survenue lors de la suppression de l'utilisateur"
       });
     }
   }

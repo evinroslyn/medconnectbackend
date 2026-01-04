@@ -31,14 +31,19 @@ function createTransporter() {
       pass,
     },
     // Options de robustesse pour éviter les Timeouts sur Render/Supabase
-    connectionTimeout: 15000, // Augmenté à 15 secondes
-    greetingTimeout: 15000,
+    connectionTimeout: 20000, // Augmenté à 20 secondes
+    greetingTimeout: 20000,
     socketTimeout: 30000,
-    family: 4, // Forcer l'IPv4 pour contourner les problèmes de résolution réseau (IPv6 souvent problématique sur Render)
-    debug: process.env.NODE_ENV === "development",
-    logger: process.env.NODE_ENV === "development",
+    family: 4, // Forcer l'IPv4 pour contourner les problèmes de résolution réseau
+    debug: true, // Toujours activer le debug pour identifier la cause du timeout
+    logger: true,
+    tls: {
+      // Ne pas échouer sur les problèmes de certificat (souvent utile avec certains serveurs SMTP)
+      rejectUnauthorized: false
+    }
   };
 
+  console.log(`📧 Tentative de connexion SMTP: ${host}:${port} (secure: ${secure})`);
   return nodemailer.createTransport(options);
 }
 
