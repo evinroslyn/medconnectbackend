@@ -1,4 +1,3 @@
-import * as nodemailer from "nodemailer";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -12,103 +11,63 @@ export function generateVerificationCode(): string {
 }
 
 /**
- * Crée et configure le transporteur Nodemailer avec des options de robustesse
+ * Fonction interne pour envoyer un email via l'API HTTP de Brevo
  */
-function createTransporter() {
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = parseInt(process.env.SMTP_PORT || "587");
-  const secure = process.env.SMTP_SECURE === "true";
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASSWORD;
+async function sendEmailViaBrevo(params: {
+  toEmail: string;
+  toName?: string;
+  subject: string;
+  htmlContent: string;
+}) {
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderEmail = process.env.SMTP_USER || "votre-email@gmail.com";
+  const senderName = "Med-Connect";
 
-  // Configuration de base pour Nodemailer
-  const options: any = {
-    host,
-    port,
-    secure,
-    auth: {
-      user,
-      pass,
-    },
-    // Options de robustesse pour éviter les Timeouts sur Render/Supabase
-    connectionTimeout: 20000, // Augmenté à 20 secondes
-    greetingTimeout: 20000,
-    socketTimeout: 30000,
-    family: 4, // Forcer l'IPv4 pour contourner les problèmes de résolution réseau
-    debug: true, // Toujours activer le debug pour identifier la cause du timeout
-    logger: true,
-    tls: {
-      // Ne pas échouer sur les problèmes de certificat (souvent utile avec certains serveurs SMTP)
-      rejectUnauthorized: false
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("\n📧 [DEV MODE] BREVO_API_KEY manquante. Contenu simulé :");
+      console.log(`🔗 Destinataire: ${params.toEmail}`);
+      console.log(`� Sujet: ${params.subject}`);
+      return;
     }
-  };
+    throw new Error("Configuration BREVO_API_KEY manquante dans les variables d'environnement.");
+  }
 
-  console.log(`📧 Tentative de connexion SMTP: ${host}:${port} (secure: ${secure})`);
-  return nodemailer.createTransport(options);
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "accept": "application/json",
+      "api-key": apiKey,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: params.toEmail, name: params.toName || params.toEmail }],
+      subject: params.subject,
+      htmlContent: params.htmlContent
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Erreur Brevo API (${response.status}): ${JSON.stringify(errorData)}`);
+  }
+
+  console.log(`✅ Email envoyé avec succès via Brevo à ${params.toEmail}`);
 }
 
 /**
  * Envoie un code de vérification par email
- * @param email - Adresse email du destinataire
- * @param code - Code de vérification à envoyer
- * @returns Promise qui se résout quand l'email est envoyé
  */
 export async function sendVerificationCodeByEmail(
   email: string,
   code: string
 ): Promise<void> {
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPassword = process.env.SMTP_PASSWORD;
-
   try {
-    const transporter = createTransporter();
-
-    // Si pas de configuration SMTP, utiliser Ethereal Email en développement
-    if (!smtpUser || !smtpPassword) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("\n📧 [DEV MODE] Configuration SMTP non trouvée, utilisation d'Ethereal Email");
-        const testAccount = await nodemailer.createTestAccount();
-        const devTransporter = nodemailer.createTransport({
-          host: "smtp.ethereal.email",
-          port: 587,
-          secure: false,
-          auth: {
-            user: testAccount.user,
-            pass: testAccount.pass,
-          },
-        });
-
-        const info = await devTransporter.sendMail({
-          from: '"Med-Connect" <noreply@medconnect.local>',
-          to: email,
-          subject: "Code de vérification Med-Connect",
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb;">Code de vérification</h2>
-              <p>Votre code de vérification pour Med-Connect est :</p>
-              <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0;">
-                <h1 style="color: #2563eb; font-size: 32px; margin: 0;">${code}</h1>
-              </div>
-              <p style="color: #6b7280; font-size: 14px;">
-                Ce code est valide pendant 14 jours. Ne partagez jamais ce code avec personne.
-              </p>
-            </div>
-          `,
-        });
-
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        if (previewUrl) console.log("🔗 Preview URL:", previewUrl);
-        return;
-      } else {
-        throw new Error("Configuration SMTP manquante (SMTP_USER/SMTP_PASSWORD).");
-      }
-    }
-
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Med-Connect" <noreply@medconnect.local>',
-      to: email,
+    await sendEmailViaBrevo({
+      toEmail: email,
       subject: "Code de vérification Med-Connect",
-      html: `
+      htmlContent: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">Code de vérification</h2>
           <p>Votre code de vérification pour Med-Connect est :</p>
@@ -117,9 +76,8 @@ export async function sendVerificationCodeByEmail(
           </div>
           <p style="color: #6b7280; font-size: 14px;">Ce code est valide pendant 14 jours.</p>
         </div>
-      `,
+      `
     });
-    console.log("✅ Email de vérification envoyé à %s", email);
   } catch (error: any) {
     console.error("❌ Erreur lors de l'envoi de l'email de vérification:", error.message);
     if (process.env.NODE_ENV !== "development") throw error;
@@ -133,26 +91,11 @@ export async function sendPasswordResetCodeByEmail(
   email: string,
   code: string
 ): Promise<void> {
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPassword = process.env.SMTP_PASSWORD;
-
   try {
-    const transporter = createTransporter();
-
-    if (!smtpUser || !smtpPassword) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("\n📧 [DEV MODE] Code de réinitialisation: " + code);
-        return;
-      }
-      throw new Error("Configuration SMTP manquante.");
-    }
-
-    await transporter.verify();
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Med-Connect" <noreply@medconnect.local>',
-      to: email,
+    await sendEmailViaBrevo({
+      toEmail: email,
       subject: "Réinitialisation de mot de passe - Med-Connect",
-      html: `
+      htmlContent: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">Réinitialisation de mot de passe</h2>
           <p>Utilisez le code suivant :</p>
@@ -161,9 +104,8 @@ export async function sendPasswordResetCodeByEmail(
           </div>
           <p style="color: #6b7280; font-size: 14px;">Ce code est valide pendant 15 minutes.</p>
         </div>
-      `,
+      `
     });
-    console.log("✅ Email de réinitialisation envoyé à %s", email);
   } catch (error: any) {
     console.error("❌ Erreur lors de l'envoi de l'email de réinitialisation:", error.message);
     if (process.env.NODE_ENV !== "development") throw error;
@@ -213,25 +155,12 @@ export async function sendPasswordByEmail(
   password: string,
   nom?: string
 ): Promise<void> {
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPassword = process.env.SMTP_PASSWORD;
-
   try {
-    const transporter = createTransporter();
-
-    if (!smtpUser || !smtpPassword) {
-      if (process.env.NODE_ENV === "development") {
-        console.log(`🔑 [DEV MODE] Mot de passe pour ${email}: ${password}`);
-        return;
-      }
-      throw new Error("Configuration SMTP manquante.");
-    }
-
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Med-Connect" <noreply@medconnect.local>',
-      to: email,
+    await sendEmailViaBrevo({
+      toEmail: email,
+      toName: nom,
       subject: "Votre compte Med-Connect a été validé",
-      html: `
+      htmlContent: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">Bienvenue sur Med-Connect${nom ? `, ${nom}` : ''} !</h2>
           <p>Votre demande d'inscription a été validée.</p>
@@ -241,9 +170,8 @@ export async function sendPasswordByEmail(
           </div>
           <p style="color: #dc2626;">Veuillez changer ce mot de passe après votre première connexion.</p>
         </div>
-      `,
+      `
     });
-    console.log("✅ Email de mot de passe envoyé à %s", email);
   } catch (error: any) {
     console.error("❌ Erreur lors de l'envoi de l'email de mot de passe:", error.message);
     throw error;
@@ -258,25 +186,12 @@ export async function sendRejectionEmailByEmail(
   nom?: string,
   motif?: string
 ): Promise<void> {
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPassword = process.env.SMTP_PASSWORD;
-
   try {
-    const transporter = createTransporter();
-
-    if (!smtpUser || !smtpPassword) {
-      if (process.env.NODE_ENV === "development") {
-        console.log(`❌ [DEV MODE] Email de rejet pour ${email}`);
-        return;
-      }
-      throw new Error("Configuration SMTP manquante.");
-    }
-
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Med-Connect" <noreply@medconnect.local>',
-      to: email,
+    await sendEmailViaBrevo({
+      toEmail: email,
+      toName: nom,
       subject: "Demande d'inscription rejetée - Med-Connect",
-      html: `
+      htmlContent: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #dc2626;">Demande d'inscription rejetée</h2>
           <p>Bonjour${nom ? ` ${nom}` : ''},</p>
@@ -284,9 +199,8 @@ export async function sendRejectionEmailByEmail(
           ${motif ? `<p><strong>Motif :</strong> ${motif}</p>` : ''}
           <p>L'équipe Med-Connect</p>
         </div>
-      `,
+      `
     });
-    console.log("✅ Email de rejet envoyé à %s", email);
   } catch (error: any) {
     console.error("❌ Erreur lors de l'envoi de l'email de rejet:", error.message);
     if (process.env.NODE_ENV !== "development") throw error;
