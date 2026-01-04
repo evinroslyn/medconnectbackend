@@ -108,7 +108,7 @@ export class AuthService {
         // Générer un mot de passe temporaire qui sera remplacé lors de la validation
         const tempPassword = generatePassword(16);
         hashedPassword = await hashPassword(tempPassword);
-        
+
         console.log('👨‍⚕️ ═══════════════════════════════════════════════════════════════');
         console.log('👨‍⚕️ CRÉATION DE MÉDECIN - MOT DE PASSE TEMPORAIRE GÉNÉRÉ');
         console.log('👨‍⚕️ ═══════════════════════════════════════════════════════════════');
@@ -127,14 +127,14 @@ export class AuthService {
             message: "Le mot de passe est requis pour les patients et administrateurs"
           };
         }
-        
+
         if (userData.motDePasse.length < 8) {
           return {
             success: false,
             message: `Le mot de passe est trop court. Il contient ${userData.motDePasse.length} caractère(s) mais doit en contenir au moins 8.`
           };
         }
-        
+
         // Valider la complexité du mot de passe
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
         if (!passwordRegex.test(userData.motDePasse)) {
@@ -155,70 +155,69 @@ export class AuthService {
           message: "Une adresse email valide est obligatoire pour recevoir les codes de vérification. Format attendu: exemple@domaine.com"
         };
       }
-      
-      // Créer l'utilisateur de base
-      await db.insert(utilisateurs).values({
-        id: userId,
-        mail: userData.mail,
-        motDePasse: hashedPassword,
-        telephone: userData.telephone || "",
-        typeUtilisateur: userData.typeUtilisateur,
-        adresse: userData.adresse || null,
-        dateCreation: new Date(),
-      });
 
-      // Créer l'enregistrement spécifique selon le type
-      switch (userData.typeUtilisateur) {
-        case "patient": {
-          if (!userData.dateNaissance) {
-            return {
-              success: false,
-              message: "La date de naissance est obligatoire pour les patients"
-            };
+      // Utiliser une transaction pour garantir que l'utilisateur et son profil spécifique sont créés ensemble
+      await db.transaction(async (tx) => {
+        // 1. Créer l'utilisateur de base
+        await tx.insert(utilisateurs).values({
+          id: userId,
+          mail: userData.mail,
+          motDePasse: hashedPassword,
+          telephone: userData.telephone || null,
+          typeUtilisateur: userData.typeUtilisateur,
+          adresse: userData.adresse || null,
+          dateCreation: new Date(),
+        });
+
+        // 2. Créer l'enregistrement spécifique selon le type
+        switch (userData.typeUtilisateur) {
+          case "patient": {
+            if (!userData.dateNaissance) {
+              throw new Error("La date de naissance est obligatoire pour les patients");
+            }
+            if (!userData.genre) {
+              throw new Error("Le genre est obligatoire pour les patients");
+            }
+            const dateNaissanceFormatted = userData.dateNaissance.split("T")[0];
+
+            await tx.insert(patients).values({
+              id: userId,
+              nom: userData.nom,
+              dateNaissance: dateNaissanceFormatted as any,
+              genre: userData.genre,
+            });
+            break;
           }
-          if (!userData.genre) {
-            return {
-              success: false,
-              message: "Le genre est obligatoire pour les patients. Veuillez sélectionner Homme, Femme ou Autre"
-            };
-          }
-          // Convertir la date de naissance (string ISO) en format MySQL date (YYYY-MM-DD)
-          const dateNaissanceFormatted = userData.dateNaissance.split("T")[0];
-          
-          // Drizzle date() accepte string au format YYYY-MM-DD
-          await db.insert(patients).values({
-            id: userId,
-            nom: userData.nom,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            dateNaissance: dateNaissanceFormatted as any,
-            genre: userData.genre,
-          });
-          break;
+
+          case "medecin":
+            if (!userData.specialite || !userData.numeroLicence || !userData.documentIdentite || !userData.diplome) {
+              throw new Error("Spécialité, numéro de licence, document d'identité et diplôme requis pour les médecins");
+            }
+            await tx.insert(medecins).values({
+              id: userId,
+              nom: userData.nom,
+              specialite: userData.specialite,
+              numeroLicence: userData.numeroLicence,
+              statutVerification: "en_attente",
+              documentIdentite: userData.documentIdentite,
+              diplome: userData.diplome,
+              photoProfil: userData.photoProfil || null,
+              // Nouveaux champs supportés par le schéma
+              anneesExperience: (userData as any).anneesExperience || null,
+              description: (userData as any).description || null,
+              education: (userData as any).education || null,
+              specialisations: (userData as any).specialisations || null,
+            });
+            break;
+
+          case "administrateur":
+            await tx.insert(administrateurs).values({
+              id: userId,
+              nom: userData.nom,
+            });
+            break;
         }
-
-        case "medecin":
-          if (!userData.specialite || !userData.numeroLicence || !userData.documentIdentite || !userData.diplome) {
-            throw new Error("Spécialité, numéro de licence, document d'identité et diplôme requis pour les médecins");
-          }
-          await db.insert(medecins).values({
-            id: userId,
-            nom: userData.nom,
-            specialite: userData.specialite,
-            numeroLicence: userData.numeroLicence,
-            statutVerification: "en_attente",
-            documentIdentite: userData.documentIdentite,
-            diplome: userData.diplome,
-            photoProfil: userData.photoProfil || null,
-          });
-          break;
-
-        case "administrateur":
-          await db.insert(administrateurs).values({
-            id: userId,
-            nom: userData.nom,
-          });
-          break;
-      }
+      });
 
       // Pour les médecins, ne pas générer de token (ils doivent attendre la validation)
       if (userData.typeUtilisateur === "medecin") {
@@ -256,13 +255,13 @@ export class AuthService {
     } catch (error: any) {
       console.error("Erreur lors de l'inscription:", error);
       console.error("Stack trace:", error.stack);
-      
+
       // Extraire le message d'erreur détaillé
       let errorMessage = "Erreur lors de l'inscription";
-      
+
       if (error.message) {
         const errorMsg = error.message.toString();
-        
+
         // Détecter les erreurs de duplication d'email
         if (errorMsg.includes("Duplicate entry") && errorMsg.includes("mail")) {
           const emailMatch = errorMsg.match(/'([^']+)'/);
@@ -301,7 +300,7 @@ export class AuthService {
             errorMessage = `Erreur de base de données: ${error.code}. ${error.message || ''}`;
         }
       }
-      
+
       return {
         success: false,
         message: errorMessage
@@ -379,18 +378,18 @@ export class AuthService {
       // IMPORTANT: La 2FA est OBLIGATOIRE uniquement pour les patients
       // Les médecins et administrateurs n'ont JAMAIS besoin de 2FA
       const is2FARequired = userData.typeUtilisateur === "patient";
-      
+
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthService.ts:368',message:'Début évaluation 2FA',data:{typeUtilisateur:userData.typeUtilisateur,is2FARequiredInitial:is2FARequired},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'AuthService.ts:368', message: 'Début évaluation 2FA', data: { typeUtilisateur: userData.typeUtilisateur, is2FARequiredInitial: is2FARequired }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
       // #endregion
-      
+
       // Les médecins n'ont jamais besoin de 2FA, même s'ils sont validés
       // (La vérification du statut de validation est déjà faite plus haut)
-      
+
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthService.ts:383',message:'Vérification condition 2FA',data:{is2FARequired,hasCode2FA:!!loginData.code2FA,typeUtilisateur:userData.typeUtilisateur,willGenerateCode:is2FARequired && !loginData.code2FA},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'AuthService.ts:383', message: 'Vérification condition 2FA', data: { is2FARequired, hasCode2FA: !!loginData.code2FA, typeUtilisateur: userData.typeUtilisateur, willGenerateCode: is2FARequired && !loginData.code2FA }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
       // #endregion
-      
+
       // Si pas de code 2FA fourni et 2FA requis, générer et envoyer un code par email
       if (is2FARequired && !loginData.code2FA) {
         // Vérifier que l'utilisateur a un email valide
@@ -405,21 +404,21 @@ export class AuthService {
         const verificationCode = generateVerificationCode();
         const expirationTime = new Date();
         expirationTime.setDate(expirationTime.getDate() + 14); // Code valide 2 semaines
-        
+
         // Log en développement
         if (process.env.NODE_ENV === "development") {
           console.log(`[2FA Debug] Génération du code: "${verificationCode}" pour l'utilisateur ${userData.id}`);
         }
-        
+
         // Stocker le code en base de données
         await db
           .update(utilisateurs)
-          .set({ 
+          .set({
             codeSMS: verificationCode, // On garde le même champ pour la compatibilité
             codeSMSExpiration: expirationTime
           })
           .where(eq(utilisateurs.id, userData.id));
-        
+
         // Vérifier que le code a bien été stocké (en développement)
         if (process.env.NODE_ENV === "development") {
           const verifyStored = await db
@@ -429,18 +428,18 @@ export class AuthService {
             .limit(1);
           console.log(`[2FA Debug] Code stocké vérifié: "${verifyStored[0]?.codeSMS}"`);
         }
-        
+
         // Envoyer le code par email
         await sendVerificationCodeByEmail(userData.mail, verificationCode);
-        
+
         const message = process.env.NODE_ENV === "development"
           ? `Un code de vérification a été envoyé à votre adresse email (${userData.mail || "non configurée"}).\n\n🔑 Code de vérification (DEV): ${verificationCode}\n\nVeuillez vérifier votre boîte de réception.`
           : `Un code de vérification a été envoyé à votre adresse email (${userData.mail || "non configurée"}). Veuillez vérifier votre boîte de réception.`;
-        
+
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthService.ts:428',message:'Retour réponse 2FA requise',data:{typeUtilisateur:userData.typeUtilisateur,require2FA:true,message:message.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'AuthService.ts:428', message: 'Retour réponse 2FA requise', data: { typeUtilisateur: userData.typeUtilisateur, require2FA: true, message: message.substring(0, 100) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
         // #endregion
-        
+
         return {
           success: false,
           message,
@@ -463,17 +462,17 @@ export class AuthService {
           .from(utilisateurs)
           .where(eq(utilisateurs.id, userData.id))
           .limit(1);
-        
+
         if (userWithCode.length === 0) {
           return {
             success: false,
             message: "Erreur lors de la vérification du code"
           };
         }
-        
+
         const storedCode = userWithCode[0].codeSMS;
         const expirationTime = userWithCode[0].codeSMSExpiration;
-        
+
         // Logs de débogage en développement
         if (process.env.NODE_ENV === "development") {
           console.log(`[2FA Debug] Code fourni: "${loginData.code2FA}" (type: ${typeof loginData.code2FA}, length: ${loginData.code2FA.length})`);
@@ -484,15 +483,15 @@ export class AuthService {
             console.log(`[2FA Debug] Code expiré: ${new Date() > expirationTime}`);
           }
         }
-        
+
         // Vérifier le code de vérification
         const isCodeValid = verifyCode(loginData.code2FA, storedCode, expirationTime);
-        
+
         // Log uniquement en mode développement pour le diagnostic
         if (process.env.NODE_ENV === "development") {
           console.log(`[2FA Debug] Code valide: ${isCodeValid}`);
         }
-        
+
         if (!isCodeValid) {
           // Message plus détaillé pour aider au diagnostic
           if (!storedCode) {
@@ -512,11 +511,11 @@ export class AuthService {
             message: "Code de vérification invalide. Veuillez vérifier et réessayer."
           };
         }
-        
+
         // Code valide, supprimer le code utilisé et mettre à jour la dernière connexion en une seule requête
         await db
           .update(utilisateurs)
-          .set({ 
+          .set({
             codeSMS: null,
             codeSMSExpiration: null,
             derniereConnexion: new Date()
@@ -697,7 +696,7 @@ export class AuthService {
       }
 
       const baseUser = userData[0];
-      
+
       // Récupérer le nom selon le type d'utilisateur
       const nom = await this.getUserName(userId, typeUtilisateur);
 
@@ -719,10 +718,10 @@ export class AuthService {
           .from(patients)
           .where(eq(patients.id, userId))
           .limit(1);
-        
+
         if (patientData.length > 0) {
           // Convertir la date en string ISO si elle existe
-          userProfile.dateNaissance = patientData[0].dateNaissance 
+          userProfile.dateNaissance = patientData[0].dateNaissance
             ? new Date(patientData[0].dateNaissance).toISOString().split('T')[0]
             : undefined;
           userProfile.genre = patientData[0].genre;
@@ -736,7 +735,7 @@ export class AuthService {
           .from(medecins)
           .where(eq(medecins.id, userId))
           .limit(1);
-        
+
         if (medecinData.length > 0) {
           userProfile.specialite = medecinData[0].specialite;
           userProfile.numeroLicence = medecinData[0].numeroLicence;
@@ -811,7 +810,7 @@ export class AuthService {
           .from(utilisateurs)
           .where(eq(utilisateurs.mail, updates.mail))
           .limit(1);
-        
+
         if (existingUser.length > 0 && existingUser[0].id !== userId) {
           return {
             success: false,
@@ -987,7 +986,7 @@ export class AuthService {
   static async requestPasswordReset(telephone: string): Promise<{ success: boolean; message: string; devCode?: string }> {
     try {
       console.log(`[AuthService] requestPasswordReset - Recherche utilisateur avec téléphone: ${telephone}`);
-      
+
       // Rechercher l'utilisateur par téléphone
       const user = await db
         .select()
@@ -1031,7 +1030,7 @@ export class AuthService {
       let emailSent = false;
       let devCode: string | undefined = undefined;
       let emailError: any = null;
-      
+
       try {
         console.log(`📧 Tentative d'envoi d'email de réinitialisation à ${userData.mail}...`);
         await sendPasswordResetCodeByEmail(
@@ -1044,7 +1043,7 @@ export class AuthService {
         emailError = err;
         console.error("❌ Erreur lors de l'envoi de l'email:", err.message || err);
         console.error("❌ Détails de l'erreur:", JSON.stringify(err, null, 2));
-        
+
         // En développement, toujours inclure le code dans la réponse si l'email échoue
         if (process.env.NODE_ENV === "development") {
           console.log(`\n⚠️  [DEV MODE] Code de réinitialisation pour ${telephone} (${userData.mail}): ${resetCode}\n`);
@@ -1055,7 +1054,7 @@ export class AuthService {
       // Vérifier si SMTP est configuré
       const smtpConfigured = !!(process.env.SMTP_USER && process.env.SMTP_PASSWORD);
       console.log(`[AuthService] SMTP configuré: ${smtpConfigured}, Email envoyé: ${emailSent}`);
-      
+
       // En mode développement, inclure le code dans la réponse SEULEMENT si l'email n'a pas été envoyé
       // pour faciliter les tests quand SMTP n'est pas configuré
       if (process.env.NODE_ENV === "development" && !emailSent) {
@@ -1086,7 +1085,7 @@ export class AuthService {
         message: message,
         ...(process.env.NODE_ENV === "development" && devCode && { devCode: devCode })
       };
-      
+
       console.log(`[AuthService] Réponse finale préparée:`, JSON.stringify(response, null, 2));
       return response;
     } catch (error: any) {
@@ -1160,11 +1159,11 @@ export class AuthService {
       const updateData: any = {
         motDePasse: hashedPassword,
       };
-      
+
       // Utiliser undefined au lieu de null pour éviter les erreurs Drizzle
       updateData.codeResetPassword = undefined;
       updateData.codeResetPasswordExpires = undefined;
-      
+
       await db
         .update(utilisateurs)
         .set(updateData)
