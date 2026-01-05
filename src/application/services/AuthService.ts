@@ -4,7 +4,7 @@ import { utilisateurs, patients, medecins, administrateurs } from "../../infrast
 import { hashPassword, comparePassword } from "../../infrastructure/auth/hash";
 import { generateToken } from "../../infrastructure/auth/jwt";
 import { generate2FASecret, generate2FAUrl, verify2FA } from "../../infrastructure/auth/2fa";
-import { generateVerificationCode, sendVerificationCodeByEmail, sendPasswordResetCodeByEmail, verifyCode, generatePassword } from "../../infrastructure/auth/email2fa";
+import { generateVerificationCode, sendVerificationCodeByEmail, sendVerificationCodeBySMS, sendPasswordResetCodeByEmail, sendPasswordResetCodeBySMS, verifyCode, generatePassword } from "../../infrastructure/auth/email2fa";
 import { randomUUID } from "crypto";
 
 /**
@@ -432,9 +432,20 @@ export class AuthService {
         // Envoyer le code par email
         await sendVerificationCodeByEmail(userData.mail, verificationCode);
 
+        // Envoyer le code par SMS si numéro de téléphone présent
+        let smsSent = false;
+        if (userData.telephone) {
+          try {
+            await sendVerificationCodeBySMS(userData.telephone, verificationCode);
+            smsSent = true;
+          } catch (smsErr: any) {
+            console.error("❌ Erreur lors de l'envoi du SMS 2FA:", smsErr.message || smsErr);
+          }
+        }
+
         const message = process.env.NODE_ENV === "development"
-          ? `Un code de vérification a été envoyé à votre adresse email (${userData.mail || "non configurée"}).\n\n🔑 Code de vérification (DEV): ${verificationCode}\n\nVeuillez vérifier votre boîte de réception.`
-          : `Un code de vérification a été envoyé à votre adresse email (${userData.mail || "non configurée"}). Veuillez vérifier votre boîte de réception.`;
+          ? `Un code de vérification a été envoyé par email${smsSent ? " et par SMS" : ""}.\n\n🔑 Code de vérification (DEV): ${verificationCode}`
+          : `Un code de vérification a été envoyé par email${smsSent ? " et par SMS" : ""}. Veuillez vérifier vos messages.`;
 
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'AuthService.ts:428', message: 'Retour réponse 2FA requise', data: { typeUtilisateur: userData.typeUtilisateur, require2FA: true, message: message.substring(0, 100) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
@@ -1042,13 +1053,25 @@ export class AuthService {
       } catch (err: any) {
         emailError = err;
         console.error("❌ Erreur lors de l'envoi de l'email:", err.message || err);
-        console.error("❌ Détails de l'erreur:", JSON.stringify(err, null, 2));
+      }
 
-        // En développement, toujours inclure le code dans la réponse si l'email échoue
-        if (process.env.NODE_ENV === "development") {
-          console.log(`\n⚠️  [DEV MODE] Code de réinitialisation pour ${telephone} (${userData.mail}): ${resetCode}\n`);
-          devCode = resetCode; // Inclure le code dans la réponse en développement
+      // Envoyer le code par SMS si numéro de téléphone présent
+      let smsSent = false;
+      if (userData.telephone) {
+        try {
+          console.log(`📱 Tentative d'envoi de SMS de réinitialisation à ${userData.telephone}...`);
+          await sendPasswordResetCodeBySMS(userData.telephone, resetCode);
+          smsSent = true;
+          console.log(`✅ SMS de réinitialisation envoyé avec succès à ${userData.telephone}`);
+        } catch (smsErr: any) {
+          console.error("❌ Erreur lors de l'envoi du SMS:", smsErr.message || smsErr);
         }
+      }
+
+      // En développement, inclure le code dans la réponse si au moins un canal a échoué
+      if (process.env.NODE_ENV === "development" && (!emailSent || (userData.telephone && !smsSent))) {
+        console.log(`\n⚠️  [DEV MODE] Code de réinitialisation pour ${telephone}: ${resetCode}\n`);
+        devCode = resetCode;
       }
 
       // Vérifier si SMTP est configuré
@@ -1066,18 +1089,16 @@ export class AuthService {
 
       // Construire le message
       let message: string;
-      if (emailSent) {
-        message = "Si un compte existe avec ce numéro de téléphone, un code de réinitialisation a été envoyé par email.";
+      if (emailSent && smsSent) {
+        message = "Un code de réinitialisation a été envoyé par email et par SMS.";
+      } else if (emailSent) {
+        message = "Un code de réinitialisation a été envoyé par email.";
+      } else if (smsSent) {
+        message = "Un code de réinitialisation a été envoyé par SMS.";
       } else if (process.env.NODE_ENV === "development" && devCode) {
-        message = `Code de réinitialisation (DEV MODE): ${devCode}. Ce code est valide pendant 15 minutes.`;
-        if (emailError) {
-          message += ` (Erreur email: ${emailError.message})`;
-        }
+        message = `Code de réinitialisation (DEV MODE): ${devCode}.`;
       } else {
-        message = "Si un compte existe avec ce numéro de téléphone, un code de réinitialisation a été envoyé par email.";
-        if (emailError && smtpConfigured) {
-          console.error("⚠️  SMTP configuré mais l'envoi a échoué. Vérifiez les logs pour plus de détails.");
-        }
+        message = "Si un compte existe, un code de réinitialisation a été envoyé.";
       }
 
       const response = {

@@ -206,3 +206,87 @@ export async function sendRejectionEmailByEmail(
     if (process.env.NODE_ENV !== "development") throw error;
   }
 }
+
+/**
+ * Fonction interne pour envoyer un SMS via l'API HTTP de Brevo
+ */
+async function sendSMSViaBrevo(params: {
+  recipient: string;
+  content: string;
+  tag?: string;
+}) {
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderName = process.env.SMS_SENDER_NAME || "MedConnect";
+
+  if (!apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("\n📱 [DEV MODE] BREVO_API_KEY manquante. SMS simulé :");
+      console.log(`🔗 Destinataire: ${params.recipient}`);
+      console.log(`💬 Contenu: ${params.content}`);
+      return;
+    }
+    throw new Error("Configuration BREVO_API_KEY manquante pour l'envoi de SMS.");
+  }
+
+  // Nettoyer le numéro de téléphone (doit être au format international sans le + pour Brevo transactional SMS, 
+  // mais acceptons avec + car l'API semble le tolérer ou le requérir selon la doc)
+  const recipient = params.recipient.startsWith('+') ? params.recipient : `+${params.recipient}`;
+
+  const response = await fetch("https://api.brevo.com/v3/transactionalSMS/sms", {
+    method: "POST",
+    headers: {
+      "accept": "application/json",
+      "api-key": apiKey,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      sender: senderName.substring(0, 11), // Brevo limite le sender à 11 caractères alphanumériques
+      recipient: recipient,
+      content: params.content,
+      type: "transactional"
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Erreur Brevo SMS API (${response.status}): ${JSON.stringify(errorData)}`);
+  }
+
+  console.log(`✅ SMS envoyé avec succès via Brevo à ${params.recipient}`);
+}
+
+/**
+ * Envoie un code de vérification par SMS
+ */
+export async function sendVerificationCodeBySMS(
+  phoneNumber: string,
+  code: string
+): Promise<void> {
+  try {
+    await sendSMSViaBrevo({
+      recipient: phoneNumber,
+      content: `Votre code de vérification Med-Connect est : ${code}. Ce code est valide pendant 15 minutes.`
+    });
+  } catch (error: any) {
+    console.error("❌ Erreur lors de l'envoi du SMS de vérification:", error.message);
+    if (process.env.NODE_ENV !== "development") throw error;
+  }
+}
+
+/**
+ * Envoie un code de réinitialisation de mot de passe par SMS
+ */
+export async function sendPasswordResetCodeBySMS(
+  phoneNumber: string,
+  code: string
+): Promise<void> {
+  try {
+    await sendSMSViaBrevo({
+      recipient: phoneNumber,
+      content: `Code de réinitialisation Med-Connect : ${code}. Valide 15 mins. Ne le partagez pas.`
+    });
+  } catch (error: any) {
+    console.error("❌ Erreur lors de l'envoi du SMS de réinitialisation:", error.message);
+    if (process.env.NODE_ENV !== "development") throw error;
+  }
+}
