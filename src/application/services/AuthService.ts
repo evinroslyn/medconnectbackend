@@ -359,6 +359,8 @@ export class AuthService {
         };
       }
 
+      console.log(`👤 [Login] Utilisateur: ${userData.id} (Type: ${userData.typeUtilisateur})`);
+
       // Vérifier le statut de vérification pour les médecins
       if (userData.typeUtilisateur === "medecin") {
         const medecinData = await db
@@ -378,6 +380,8 @@ export class AuthService {
       // IMPORTANT: La 2FA est OBLIGATOIRE uniquement pour les patients
       // Les médecins et administrateurs n'ont JAMAIS besoin de 2FA
       const is2FARequired = userData.typeUtilisateur === "patient";
+
+      console.log(`🔒 [Login] 2FA Requis: ${is2FARequired} (Code fourni: ${!!loginData.code2FA ? 'OUI' : 'NON'})`);
 
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'AuthService.ts:368', message: 'Début évaluation 2FA', data: { typeUtilisateur: userData.typeUtilisateur, is2FARequiredInitial: is2FARequired }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
