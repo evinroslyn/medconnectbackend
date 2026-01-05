@@ -405,51 +405,39 @@ export class AuthService {
         const expirationTime = new Date();
         expirationTime.setDate(expirationTime.getDate() + 14); // Code valide 2 semaines
 
-        // Log en développement
-        if (process.env.NODE_ENV === "development") {
-          console.log(`[2FA Debug] Génération du code: "${verificationCode}" pour l'utilisateur ${userData.id}`);
-        }
+        console.log(`🔐 [2FA] Génération code pour ${userData.id} (${userData.typeUtilisateur}). Tel: ${userData.telephone ? 'PRESENT' : 'MANQUANT'}`);
 
         // Stocker le code en base de données
         await db
           .update(utilisateurs)
           .set({
-            codeSMS: verificationCode, // On garde le même champ pour la compatibilité
+            codeSMS: verificationCode,
             codeSMSExpiration: expirationTime
           })
           .where(eq(utilisateurs.id, userData.id));
 
-        // Vérifier que le code a bien été stocké (en développement)
-        if (process.env.NODE_ENV === "development") {
-          const verifyStored = await db
-            .select({ codeSMS: utilisateurs.codeSMS })
-            .from(utilisateurs)
-            .where(eq(utilisateurs.id, userData.id))
-            .limit(1);
-          console.log(`[2FA Debug] Code stocké vérifié: "${verifyStored[0]?.codeSMS}"`);
-        }
-
         // Envoyer le code par email
+        console.log(`📧 [2FA] Envoi code par email à ${userData.mail}`);
         await sendVerificationCodeByEmail(userData.mail, verificationCode);
 
         // Envoyer le code par SMS si numéro de téléphone présent
         let smsSent = false;
         if (userData.telephone) {
           try {
+            console.log(`📱 [2FA] Tentative envoi SMS à ${userData.telephone}`);
             await sendVerificationCodeBySMS(userData.telephone, verificationCode);
             smsSent = true;
+            console.log(`✅ [2FA] SMS envoyé avec succès`);
           } catch (smsErr: any) {
-            console.error("❌ Erreur lors de l'envoi du SMS 2FA:", smsErr.message || smsErr);
+            console.error("❌ [2FA] Erreur envoi SMS:", smsErr.message || smsErr);
           }
+        } else {
+          console.warn(`⚠️ [2FA] Pas d'envoi SMS : Numéro de téléphone manquant pour l'utilisateur ${userData.id}`);
         }
 
         const message = process.env.NODE_ENV === "development"
           ? `Un code de vérification a été envoyé par email${smsSent ? " et par SMS" : ""}.\n\n🔑 Code de vérification (DEV): ${verificationCode}`
           : `Un code de vérification a été envoyé par email${smsSent ? " et par SMS" : ""}. Veuillez vérifier vos messages.`;
-
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/7182a11c-95b2-469e-bf23-be365d7d7a16', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'AuthService.ts:428', message: 'Retour réponse 2FA requise', data: { typeUtilisateur: userData.typeUtilisateur, require2FA: true, message: message.substring(0, 100) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-        // #endregion
 
         return {
           success: false,
@@ -459,7 +447,7 @@ export class AuthService {
             telephone: userData.telephone || "",
             typeUtilisateur: userData.typeUtilisateur,
             nom: await this.getUserName(userData.id, userData.typeUtilisateur),
-            mail: userData.mail, // Ajouter le mail dans la réponse
+            mail: userData.mail,
             require2FA: true,
           }
         };
